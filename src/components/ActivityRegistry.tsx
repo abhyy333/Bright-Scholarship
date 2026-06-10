@@ -36,6 +36,7 @@ export default function ActivityRegistry({
 }: ActivityRegistryProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [showInvolvedAwardees, setShowInvolvedAwardees] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (deleteConfirmId) {
@@ -166,7 +167,7 @@ export default function ActivityRegistry({
     setUploadedImageName(null);
     setShowAddForm(false);
     
-    setSuccessMessage(`PROGRAM TELAH LOGGED: '${newActivity.title}' berhasil didaftarkan! +${hoursEarned} Jam Pengabdian didelegasikan otomatis ke seluruh (${involvedAwardees.length}) Awardee.`);
+     setSuccessMessage(`PROGRAM TELAH LOGGED: '${newActivity.title}' berhasil didaftarkan! +${hoursEarned} Jam Pembinaan didelegasikan otomatis ke seluruh (${involvedAwardees.length}) Awardee.`);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -554,20 +555,53 @@ export default function ActivityRegistry({
 
               {/* Participants list footer footer */}
               <div className="p-4 pt-0">
-                <div className="border-t border-slate-102 border-slate-100 pt-3 flex items-center justify-between gap-2.5">
-                  <span className="text-[10px] font-bold text-slate-400 font-sans uppercase">Awardees Terlibat ({act.awardeesInvolved.length})</span>
-                  <div className="flex -space-x-2 overflow-hidden items-center">
-                    {involvedAwardeesFull.map((aw) => (
-                      <img 
-                        key={aw.awardeeId}
-                        src={aw.avatarUrl} 
-                        alt={aw.name} 
-                        title={`${aw.name} (${aw.university})`}
-                        referrerPolicy="no-referrer"
-                        className="inline-block h-6.5 w-6.5 rounded-full ring-2 ring-white object-cover"
-                      />
-                    ))}
+                <div className="border-t border-slate-100 pt-3 flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowInvolvedAwardees(prev => ({
+                          ...prev,
+                          [act.activityId]: !prev[act.activityId]
+                        }));
+                      }}
+                      className="text-[10px] font-bold text-slate-500 hover:text-blue-600 font-sans uppercase flex items-center gap-1 cursor-pointer select-none transition-colors border-0 bg-transparent py-1 px-0"
+                    >
+                      <span>Awardees Terlibat ({act.awardeesInvolved.length})</span>
+                      <span className="text-[9px] text-blue-600 font-bold font-sans normal-case inline-flex items-center">
+                        ({showInvolvedAwardees[act.activityId] ? "Sembunyikan" : "Lihat Semua"})
+                      </span>
+                    </button>
+                    <div className="flex -space-x-2 overflow-hidden items-center">
+                      {involvedAwardeesFull.map((aw) => (
+                        <img 
+                          key={aw.awardeeId}
+                          src={aw.avatarUrl} 
+                          alt={aw.name} 
+                          title={`${aw.name} (${aw.university})`}
+                          referrerPolicy="no-referrer"
+                          className="inline-block h-6.5 w-6.5 rounded-full ring-2 ring-white object-cover"
+                        />
+                      ))}
+                    </div>
                   </div>
+
+                  {showInvolvedAwardees[act.activityId] && (
+                    <div className="mt-1 p-2.5 bg-slate-50 border border-slate-150 rounded-lg space-y-1.5 text-left animate-fadeIn">
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Daftar Mahasiswa Terlibat:</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 px-1 max-h-40 overflow-y-auto">
+                        {involvedAwardeesFull.map((aw) => (
+                          <div key={aw.awardeeId} className="flex items-center gap-2 py-0.5 border-b border-dashed border-slate-200 last:border-0 pb-1 last:pb-0">
+                            <img src={aw.avatarUrl} alt={aw.name} className="w-5 h-5 rounded-full object-cover shrink-0 border border-slate-300" referrerPolicy="no-referrer" />
+                            <div className="text-[11px] leading-tight">
+                              <span className="font-bold text-slate-800 font-sans block">{aw.name}</span>
+                              <span className="text-slate-400 text-[10px] font-sans block">{aw.university} - Angkatan {aw.batch}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

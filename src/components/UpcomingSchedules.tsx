@@ -18,7 +18,8 @@ import {
   Users,
   AlertCircle,
   Upload,
-  Image
+  Image,
+  Pencil
 } from "lucide-react";
 import { UpcomingSchedule, UserRole, AwardeeProfile, Activity } from "../types";
 
@@ -60,6 +61,36 @@ export default function UpcomingSchedules({
   }, [deleteConfirmId]);
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+
+  const handleEditScheduleClick = (sched: UpcomingSchedule) => {
+    setEditingScheduleId(sched.scheduleId);
+    setTitle(sched.title);
+    setDescription(sched.description);
+    setDate(sched.date);
+    setTime(sched.time);
+    setCategory(sched.category);
+    setLocation(sched.location);
+    setSpeaker(sched.speaker);
+    setNotes(sched.notes || "");
+    setImageUrl(sched.imageUrl || "");
+    setUploadedImageName(sched.imageUrl ? "Gambar Agenda Terunggah" : null);
+    setIsGeneral(sched.targetBatch === "all" || !sched.targetBatch);
+    setTargetBatch(sched.targetBatch && sched.targetBatch !== "all" ? sched.targetBatch : "9");
+    setShowAddForm(true);
+    
+    // Clear alerts
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    
+    // Scroll to form smoothly
+    const formEl = document.getElementById("schedule-form-container");
+    if (formEl) {
+      formEl.scrollIntoView({ behavior: "smooth" });
+    } else {
+      window.scrollTo({ top: 300, behavior: "smooth" });
+    }
+  };
 
   // Completion form states
   const [activeCompletionSchedId, setActiveCompletionSchedId] = useState<string | null>(null);
@@ -132,12 +163,6 @@ export default function UpcomingSchedules({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // User RSVP simulation state
-  const [userRsvps, setUserRsvps] = useState<Record<string, boolean>>({
-    "sched-1": true,
-    "sched-3": true,
-  });
-
   // Countdown timer for next event
   const [nextEvent, setNextEvent] = useState<UpcomingSchedule | null>(null);
   const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
@@ -146,16 +171,18 @@ export default function UpcomingSchedules({
     // Find the next upcoming event from now
     const now = new Date();
     const futureEvents = schedules
-      .filter(s => new Date(s.date + "T" + (s.time.split(" ")[0] || "08:00")) > now)
+      .filter(s => s.status !== "Selesai" && new Date(s.date + "T" + (s.time.split(" ")[0] || "08:00")) > now)
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     if (futureEvents.length > 0) {
       setNextEvent(futureEvents[0]);
-    } else if (schedules.length > 0) {
-      // Fallback to closest date even if passed for simulation beauty
-      setNextEvent(schedules[0]);
     } else {
-      setNextEvent(null);
+      const activeSchedules = schedules.filter(s => s.status !== "Selesai");
+      if (activeSchedules.length > 0) {
+        setNextEvent(activeSchedules[0]);
+      } else {
+        setNextEvent(null);
+      }
     }
   }, [schedules]);
 
@@ -277,23 +304,6 @@ export default function UpcomingSchedules({
     setDocumentationImageName(null);
   };
 
-  const handleToggleRsvp = (schedId: string) => {
-    const currentlyEnrolled = !!userRsvps[schedId];
-    setUserRsvps(prev => ({
-      ...prev,
-      [schedId]: !currentlyEnrolled
-    }));
-    onUpdateRSVP(schedId, !currentlyEnrolled);
-
-    // Provide micro feedback
-    setSuccessMessage(
-      currentlyEnrolled 
-        ? "RSVP DIBATALKAN: Kursi Anda di agenda tersebut telah dilepas." 
-        : "RSVP BERHASIL: Tempat duduk Anda telah terpesan untuk program pembinaan ini!"
-    );
-    setTimeout(() => setSuccessMessage(null), 3000);
-  };
-
   const categoriesList = [
     "All", 
     "Pembinaan Karakter", 
@@ -346,22 +356,46 @@ export default function UpcomingSchedules({
       return;
     }
 
-    const newSched: UpcomingSchedule = {
-      scheduleId: "sched-" + Date.now(),
-      title,
-      description,
-      date,
-      time,
-      category,
-      location,
-      speaker,
-      registeredAwardeesCount: 0,
-      notes: notes.trim() || undefined,
-      imageUrl: imageUrl || undefined,
-      targetBatch: isGeneral ? "all" : targetBatch
-    };
+    if (editingScheduleId) {
+      if (onUpdateSchedule) {
+        const existing = schedules.find(s => s.scheduleId === editingScheduleId);
+        onUpdateSchedule({
+          ...existing,
+          scheduleId: editingScheduleId,
+          title,
+          description,
+          date,
+          time,
+          category,
+          location,
+          speaker,
+          notes: notes.trim() || undefined,
+          imageUrl: imageUrl || undefined,
+          targetBatch: isGeneral ? "all" : targetBatch,
+          status: existing ? existing.status : "Mendatang"
+        } as UpcomingSchedule);
+        setSuccessMessage(`PERUBAHAN JADWAL BERHASIL DISIMPAN: '${title}' telah diperbarui.`);
+      }
+      setEditingScheduleId(null);
+    } else {
+      const newSched: UpcomingSchedule = {
+        scheduleId: "sched-" + Date.now(),
+        title,
+        description,
+        date,
+        time,
+        category,
+        location,
+        speaker,
+        registeredAwardeesCount: 0,
+        notes: notes.trim() || undefined,
+        imageUrl: imageUrl || undefined,
+        targetBatch: isGeneral ? "all" : targetBatch
+      };
 
-    onAddSchedule(newSched);
+      onAddSchedule(newSched);
+      setSuccessMessage(`JADWAL BERHASIL DIBUAT: '${newSched.title}' telah dimasukkan dalam schedule pipeline.`);
+    }
 
     // Clear form
     setTitle("");
@@ -377,7 +411,6 @@ export default function UpcomingSchedules({
     setTargetBatch("9");
     setShowAddForm(false);
 
-    setSuccessMessage(`JADWAL BERHASIL DIBUAT: '${newSched.title}' telah dimasukkan dalam schedule pipeline.`);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -402,7 +435,8 @@ export default function UpcomingSchedules({
       }
     }
 
-    return matchesKeyword && matchesCategory && matchesBatch;
+    const isCompleted = sched.status === "Selesai";
+    return matchesKeyword && matchesCategory && matchesBatch && !isCompleted;
   });
 
   return (
@@ -421,7 +455,7 @@ export default function UpcomingSchedules({
             <span className="font-semibold text-emerald-700"> Tahfidz Quran</span>, 
             <span className="font-semibold text-violet-700"> Pembinaan Soft Skill</span>, dan 
             <span className="font-semibold text-rose-700"> Kegiatan Sosial</span>. 
-            Awardee dapat memantau agenda harian, mendaftarkan status kehadiran (RSVP), dan menerima detail teknis acara.
+            Awardee dapat memantau agenda harian dan menerima detail teknis acara.
           </p>
         </div>
         {(currentRole === "admin" || currentRole === "fasilitator" || currentRole === "kepala_asrama") && (
@@ -521,7 +555,7 @@ export default function UpcomingSchedules({
             <div className="md:col-span-3 flex flex-col items-center justify-center">
               <div className="text-xs text-slate-300 text-center flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-white/5 border border-white/10 rounded-full">
                 <Users className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                <span>{nextEvent.registeredAwardeesCount} Awardees Terjadwal</span>
+                <span>Pembinaan Aktif</span>
               </div>
             </div>
           </div>
@@ -530,14 +564,14 @@ export default function UpcomingSchedules({
 
       {/* Reactive Form to Add Schedule (Admin Only) */}
       {showAddForm && (currentRole === "admin" || currentRole === "fasilitator" || currentRole === "kepala_asrama") && (
-        <div className="bg-white border border-blue-100 rounded-2xl p-6 shadow-sm ring-1 ring-blue-50">
+        <div id="schedule-form-container" className="bg-white border border-blue-100 rounded-2xl p-6 shadow-sm ring-1 ring-blue-50">
           <div className="flex items-center gap-2 pb-4 mb-4 border-b border-slate-100">
             <div className="p-2 rounded bg-blue-100/50">
               <Calendar className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-slate-900">Form Pembuatan Agenda & Pembinaan</h3>
-              <p className="text-[10px] text-slate-400">Silakan isi instrumen berikut untuk mempublikasikan jadwal pembinaan nasional</p>
+              <h3 className="font-bold text-sm text-slate-900">{editingScheduleId ? "Edit Agenda & Pembinaan" : "Form Pembuatan Agenda & Pembinaan"}</h3>
+              <p className="text-[10px] text-slate-400">{editingScheduleId ? "Ubah rincian agenda di bawah ini untuk memperbarui jadwal pembinaan" : "Silakan isi instrumen berikut untuk mempublikasikan jadwal pembinaan nasional"}</p>
             </div>
           </div>
 
@@ -772,7 +806,17 @@ export default function UpcomingSchedules({
                 type="button"
                 onClick={() => {
                   setShowAddForm(false);
+                  setEditingScheduleId(null);
                   setErrorMessage(null);
+                  setTitle("");
+                  setDescription("");
+                  setDate("");
+                  setTime("");
+                  setLocation("");
+                  setSpeaker("");
+                  setNotes("");
+                  setImageUrl("");
+                  setUploadedImageName(null);
                 }}
                 className="px-4 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold ring-1 ring-slate-200 cursor-pointer transition-colors"
               >
@@ -783,7 +827,7 @@ export default function UpcomingSchedules({
                 id="submit-schedule-btn"
                 className="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-extrabold shadow-sm transition-all cursor-pointer"
               >
-                Pecahkan Publikasi Jadwal
+                {editingScheduleId ? "Simpan Perubahan Jadwal" : "Pecahkan Publikasi Jadwal"}
               </button>
             </div>
           </form>
@@ -835,7 +879,6 @@ export default function UpcomingSchedules({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {filteredSchedules.map((sched) => {
-            const hasRsvped = !!userRsvps[sched.scheduleId];
             const schedStatus = getScheduleStatus(sched);
             const isCompleting = activeCompletionSchedId === sched.scheduleId;
 
@@ -920,7 +963,16 @@ export default function UpcomingSchedules({
                       )}
 
                       {(currentRole === "admin" || currentRole === "fasilitator" || currentRole === "kepala_asrama") && (
-                        <div className="relative inline-flex items-center ml-1">
+                        <div className="relative inline-flex items-center ml-1 gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleEditScheduleClick(sched)}
+                            className="text-slate-400 hover:text-blue-600 p-1 rounded-lg hover:bg-blue-550 hover:bg-blue-50 transition-colors cursor-pointer"
+                            title="Edit rincian jadwal"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+
                           {deleteConfirmId === sched.scheduleId ? (
                             <button
                               type="button"
@@ -1181,15 +1233,7 @@ export default function UpcomingSchedules({
 
                 </div>
 
-                {/* Footer RSVP interactives */}
-                {schedStatus !== "Selesai" && (
-                  <div className="bg-slate-50/70 border-t border-slate-100 px-5 py-3 flex items-center justify-between gap-3 text-xs">
-                    <div className="flex items-center gap-1.5 text-slate-500 font-sans font-medium text-[11px]">
-                      <Users className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span><b>{sched.registeredAwardeesCount}</b> Mahasiswa terjadwal</span>
-                    </div>
-                  </div>
-                )}
+                {/* Footer RSVP interactives removed */}
               </div>
             );
           })}

@@ -9,6 +9,13 @@ export const initialUsers: User[] = [
     createdAt: "2024-01-15T08:30:00Z"
   },
   {
+    uid: "admin-user-abhyy",
+    name: "Abhyy (Pengurus Pusat)",
+    email: "abhyy333@gmail.com",
+    role: "admin",
+    createdAt: "2026-06-10T14:12:00Z"
+  },
+  {
     uid: "awardee-1",
     name: "Aisyah Putri Rahayu",
     email: "aisyah.putri@student.ui.ac.id",

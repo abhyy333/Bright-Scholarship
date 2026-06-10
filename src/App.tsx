@@ -19,7 +19,8 @@ import {
   Menu,
   X,
   Key,
-  User as UserIcon
+  User as UserIcon,
+  LayoutDashboard
 } from "lucide-react";
 
 import { 
@@ -30,7 +31,7 @@ import {
   initialUpcomingSchedules
 } from "./data/mockBrightData";
 
-import { User, AwardeeProfile, Activity, ImpactStat, UserRole, UpcomingSchedule, EmailNotification } from "./types";
+import { User, AwardeeProfile, Activity, ImpactStat, UserRole, UpcomingSchedule, EmailNotification, AwardeeAchievement } from "./types";
 
 import BrightDashboard from "./components/BrightDashboard";
 import AwardeeDirectory from "./components/AwardeeDirectory";
@@ -41,6 +42,7 @@ import AccountPortal from "./components/AccountPortal";
 import MyProfile from "./components/MyProfile";
 import AdminPanel from "./components/AdminPanel";
 import AiCompiler from "./components/AiCompiler";
+import AwardeeAchievements from "./components/AwardeeAchievements";
 
 export default function App() {
   // 1. Core State Engine (Reactive state that immediately reflects any changes across tabs!)
@@ -111,21 +113,103 @@ export default function App() {
     localStorage.setItem("bright_schedules", JSON.stringify(schedules));
   }, [schedules]);
 
+  const [achievements, setAchievements] = useState<AwardeeAchievement[]>(() => {
+    const saved = localStorage.getItem("bright_achievements");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Gagal load achievements:", e);
+      }
+    }
+    return [
+      {
+        achievementId: "ach-1",
+        awardeeId: "awardee-3",
+        awardeeName: "Faris Al-Fatih",
+        title: "Juara 1 Nasional Musabaqah Tilawatil Quran (MTQ) Belajar Mahasiswa 2026",
+        category: "Non-Akademik",
+        date: "2026-05-15",
+        description: "Meraih gelar tertinggi dalam cabang Hifzhil Quran 10 Juz Putra tingkat nasional dengan nilai kumulatif 98.5, mengalahkan perwakilan puluhan perguruan tinggi terkemuka se-Indonesia.",
+        batch: "Angkatan 8",
+        university: "Institut Teknologi Bandung"
+      },
+      {
+        achievementId: "ach-2",
+        awardeeId: "awardee-1",
+        awardeeName: "Aisyah Putri Rahayu",
+        title: "Medali Emas Olimpiade Sains Nasional Bidang Informatika & Komputer 2026",
+        category: "Akademik",
+        date: "2026-04-20",
+        description: "Menempati urutan ke-3 terbaik dari ratusan finalis se-Indonesia dalam kompetisi intensif pemecahan masalah (problem solving) algoritma dan pemrograman komputer tingkat universitas.",
+        batch: "Angkatan 7",
+        university: "Universitas Indonesia"
+      },
+      {
+        achievementId: "ach-3",
+        awardeeId: "awardee-2",
+        awardeeName: "Bambang Pamungkas Utama",
+        title: "Best Paper Award di IEEE International Conference on Applied AI & Robotic Systems",
+        category: "Inovasi & Riset",
+        date: "2026-06-02",
+        description: "Menyusun karya tulis ilmiah bertema 'Deep Learning for Quranic Pronunciation Verification in Asrama Environment'. Dinilai juri memberikan solusi otomatis makhraj Al-Quran yang mutakhir berbasis digital signal processing.",
+        batch: "Angkatan 7",
+        university: "Universitas Gadjah Mada"
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem("bright_achievements", JSON.stringify(achievements));
+  }, [achievements]);
+
+  const handleAddAchievement = (newAch: AwardeeAchievement) => {
+    setAchievements(prev => [newAch, ...prev]);
+  };
+
+  const handleDeleteAchievement = (id: string) => {
+    setAchievements(prev => prev.filter(ach => ach.achievementId !== id));
+  };
+
+  const handleUpdateAchievement = (updatedAch: AwardeeAchievement) => {
+    setAchievements(prev => prev.map(ach => ach.achievementId === updatedAch.achievementId ? updatedAch : ach));
+  };
+
   // 1.1 Authentication & Registration Database State
   const [users, setUsers] = useState<User[]>(() => {
     const saved = localStorage.getItem("bright_users");
-    if (saved) return JSON.parse(saved);
-    return initialUsers;
+    let loadedUsers: User[] = saved ? JSON.parse(saved) : [...initialUsers];
+    const abhyyEmail = "abhyy333@gmail.com";
+    const hasAbhyy = loadedUsers.some(u => u.email.toLowerCase() === abhyyEmail);
+    if (!hasAbhyy) {
+      loadedUsers.push({
+        uid: "admin-user-abhyy",
+        name: "Abhyy (Pengurus Pusat)",
+        email: abhyyEmail,
+        role: "admin",
+        createdAt: "2026-06-10T14:12:00Z"
+      });
+    } else {
+      loadedUsers = loadedUsers.map(u => 
+        u.email.toLowerCase() === abhyyEmail ? { ...u, role: "admin" as UserRole, name: u.name || "Abhyy (Pengurus Pusat)" } : u
+      );
+    }
+    return loadedUsers;
   });
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<AwardeeProfile | null>(null);
   const [userPasswords, setUserPasswords] = useState<Record<string, string>>(() => {
     const saved = localStorage.getItem("bright_user_passwords");
-    if (saved) return JSON.parse(saved);
-    const creds: Record<string, string> = {};
+    const creds: Record<string, string> = saved ? JSON.parse(saved) : {};
     initialUsers.forEach(u => {
-      creds[u.email.toLowerCase()] = "password123";
+      const emailLower = u.email.toLowerCase();
+      if (!creds[emailLower]) {
+        creds[emailLower] = "password123";
+      }
     });
+    if (!creds["abhyy333@gmail.com"]) {
+      creds["abhyy333@gmail.com"] = "password123";
+    }
     return creds;
   });
 
@@ -151,9 +235,9 @@ export default function App() {
   const hasAttemptedRestore = useRef(false);
 
   // 2. Active Tab / Navigation Route
-  const [currentTab, setCurrentTab] = useState<"dashboard" | "directory" | "activities" | "schedule" | "nosql" | "portal" | "myProfile" | "adminPanel" | "aiCompiler">(() => {
+  const [currentTab, setCurrentTab] = useState<"dashboard" | "directory" | "activities" | "schedule" | "nosql" | "portal" | "myProfile" | "adminPanel" | "aiCompiler" | "achievements">(() => {
     const saved = localStorage.getItem("bright_scholarship_last_tab");
-    const allowed = ["dashboard", "directory", "activities", "schedule", "nosql", "portal", "myProfile", "adminPanel", "aiCompiler"];
+    const allowed = ["dashboard", "directory", "activities", "schedule", "nosql", "portal", "myProfile", "adminPanel", "aiCompiler", "achievements"];
     if (saved && allowed.includes(saved)) {
       return saved as any;
     }
@@ -315,7 +399,7 @@ export default function App() {
 
     return { 
       success: true, 
-      message: `Kata sandi ditemukan! Kami telah mengirimkan surel verifikasi ke kotak masuk Anda. Sandi Anda adalah: "${password}"` 
+      message: `Kami telah sukses mengirimkan instruksi detail pemulihan/pengaturan kata sandi akun Anda ke email yang dituju. Silakan periksa secepatnya.` 
     };
   };
 
@@ -337,6 +421,9 @@ export default function App() {
     const profile = awardees.find(a => a.awardeeId === foundUser.uid) || null;
     setCurrentUserProfile(profile);
 
+    // Redirect to profile tab immediately upon successful login
+    setCurrentTab("myProfile");
+
     return { success: true, message: "Berhasil masuk.", user: foundUser };
   };
 
@@ -347,21 +434,24 @@ export default function App() {
     // Save JWT securely to localStorage for real session preservation
     localStorage.setItem("bright_jwt_token", token);
     
-    // Check if user is the admin (Abdul Habir)
-    if (emailLower === "abdulhabir66@gmail.com") {
+    // Check if user is the admin (Abdul Habir or Abhyy)
+    if (emailLower === "abdulhabir66@gmail.com" || emailLower === "abhyy333@gmail.com") {
+      const defaultAdminUid = emailLower === "abdulhabir66@gmail.com" ? "admin-1" : "admin-user-abhyy";
+      const defaultAdminName = emailLower === "abdulhabir66@gmail.com" ? "Abdul Habir (Admin Utama)" : "Abhyy (Pengurus Pusat)";
+      
       let existingAdmin = users.find(u => u.email.toLowerCase() === emailLower);
       if (!existingAdmin) {
         existingAdmin = {
-          uid: "admin-1",
-          name: name || "Abdul Habir (Admin Utama)",
-          email: "abdulhabir66@gmail.com",
+          uid: defaultAdminUid,
+          name: name || defaultAdminName,
+          email: emailLower,
           role: "admin",
           createdAt: new Date().toISOString()
         };
         setUsers(prev => [...prev, existingAdmin!]);
       } else {
         existingAdmin.role = "admin";
-        existingAdmin.name = "Abdul Habir (Admin Utama)";
+        existingAdmin.name = name || existingAdmin.name || defaultAdminName;
       }
       
       setCurrentUser(existingAdmin);
@@ -392,7 +482,7 @@ export default function App() {
           message: "Login berhasil"
         });
         
-        setCurrentTab("portal");
+        setCurrentTab("myProfile");
       }
       return;
     }
@@ -444,7 +534,11 @@ export default function App() {
     }
     
     if (!isRestore) {
-      setCurrentTab("portal");
+      if (existingUser) {
+        setCurrentTab("myProfile");
+      } else {
+        setCurrentTab("portal");
+      }
     }
   };
 
@@ -752,9 +846,32 @@ export default function App() {
   // 4.6 Admin Add Staff Handler (Fasilitator, Kepala Asrama, & Admin)
   const handleAddStaff = (name: string, email: string, role: "fasilitator" | "kepala_asrama" | "admin") => {
     const emailLower = email.toLowerCase();
-    if (users.some(u => u.email.toLowerCase() === emailLower)) {
-      return { success: false, message: "Email tersebut sudah terdaftar di sistem." };
+    
+    // Check if user already exists
+    const existingUserIndex = users.findIndex(u => u.email.toLowerCase() === emailLower);
+    
+    let roleLabel = "";
+    if (role === "admin") roleLabel = "Admin / Pengurus Pusat";
+    else if (role === "fasilitator") roleLabel = "Fasilitator Akademik";
+    else roleLabel = "Kepala Asrama";
+
+    if (existingUserIndex > -1) {
+      // User already exists, we will update their role (promoting them!)
+      const updatedUsers = [...users];
+      updatedUsers[existingUserIndex].role = role;
+      setUsers(updatedUsers);
+      
+      // Update simulatedRole if currently simulating this user
+      if (simulatedUserId === users[existingUserIndex].uid) {
+        setSimulatedRole(role);
+      }
+      
+      return {
+        success: true,
+        message: `Akun '${name}' berhasil dipromosikan menjadi '${roleLabel}'!`
+      };
     }
+    
     const newUid = `staff-${Date.now()}`;
     const newUser: User = {
       uid: newUid,
@@ -764,16 +881,14 @@ export default function App() {
       createdAt: new Date().toISOString()
     };
     setUsers(prev => [...prev, newUser]);
-    // Also store password
-    setUserPasswords(prev => ({
-      ...prev,
-      [emailLower]: "password123" // Default password
-    }));
-
-    let roleLabel = "";
-    if (role === "admin") roleLabel = "Admin / Pengurus Pusat";
-    else if (role === "fasilitator") roleLabel = "Fasilitator";
-    else roleLabel = "Kepala Asrama";
+    // Also store password if not already present
+    setUserPasswords(prev => {
+      if (prev[emailLower]) return prev;
+      return {
+        ...prev,
+        [emailLower]: "password123" // Default password
+      };
+    });
 
     return { 
       success: true, 
@@ -795,12 +910,28 @@ export default function App() {
     }
   };
 
+  // 4.8 User Change Password Handler
+  const handleChangePassword = (email: string, newPass: string): boolean => {
+    const emailLower = email.toLowerCase();
+    setUserPasswords(prev => ({
+      ...prev,
+      [emailLower]: newPass
+    }));
+    return true;
+  };
+
   // 5. Callback: Update Awardee Profiling (Simulating Firestore doc update)
   const handleUpdateAwardee = (updated: AwardeeProfile) => {
     setAwardees((prev) => prev.map((a) => (a.awardeeId === updated.awardeeId ? updated : a)));
     if (currentUserProfile && currentUserProfile.awardeeId === updated.awardeeId) {
       setCurrentUserProfile(updated);
     }
+  };
+
+  // 5.1 Callback: Update Staff/User Profiling (e.g., graduationYear and batchYear)
+  const handleUpdateUser = (updatedUser: User) => {
+    setCurrentUser(updatedUser);
+    setUsers(prev => prev.map(u => u.uid === updatedUser.uid ? updatedUser : u));
   };
 
   // 6. Callback: Atomic Addition of a New Program/Activity
@@ -922,15 +1053,14 @@ export default function App() {
       <div className="flex flex-col h-full bg-white">
         {/* Sidebar Brand Identity */}
         <div className="p-6 border-b border-slate-100 text-left flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-blue-700 to-emerald-500 text-white flex items-center justify-center font-black text-sm shadow-md shadow-blue-500/10">
-              BS
-            </div>
-            <div>
-              <h1 className="text-sm font-extrabold text-blue-950 tracking-tight leading-none">Bright Scholarship</h1>
-              <span className="text-[9px] font-bold font-mono tracking-widest text-emerald-600 block mt-1 uppercase">
-                Digital Hub
-              </span>
+          <div className="flex flex-col gap-1 w-full">
+            <div className="flex items-center gap-2">
+              <img 
+                src="https://biologi.fkip.uns.ac.id/wp-content/uploads/2023/03/Logo-Bright-Scholarship.png" 
+                alt="Bright Scholarship Logo" 
+                referrerPolicy="no-referrer"
+                className="h-9 w-auto object-contain max-w-[155px]"
+              />
             </div>
           </div>
           {isMobile && (
@@ -956,7 +1086,7 @@ export default function App() {
                 : "text-slate-600 hover:bg-slate-105/50 hover:text-slate-900"
             }`}
           >
-            <Trophy className="w-4 h-4 text-emerald-600 shrink-0" />
+            <LayoutDashboard className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>Beranda & Dampak</span>
           </button>
 
@@ -972,7 +1102,22 @@ export default function App() {
             }`}
           >
             <Users className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>Penerima Beasiswa</span>
+            <span>Awardee</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setCurrentTab("achievements");
+              if (isMobile) setIsMobileSidebarOpen(false);
+            }}
+            className={`w-full text-left rounded-lg px-3.5 py-3 text-xs font-semibold flex items-center gap-3 transition-colors cursor-pointer select-none ${
+              currentTab === "achievements"
+                ? "bg-blue-50/80 text-blue-700 font-bold border border-blue-105/40"
+                : "text-slate-600 hover:bg-slate-105/50 hover:text-slate-900"
+            }`}
+          >
+            <Trophy className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Awardee Berprestasi</span>
           </button>
 
           <button
@@ -1005,22 +1150,24 @@ export default function App() {
             <span>Jadwal Pembinaan</span>
           </button>
 
-          <button
-            onClick={() => {
-              setCurrentTab("portal");
-              if (isMobile) setIsMobileSidebarOpen(false);
-            }}
-            className={`w-full text-left rounded-lg px-3.5 py-3 text-xs font-semibold flex items-center gap-3 transition-colors cursor-pointer select-none ${
-              currentTab === "portal"
-                ? "bg-blue-50/80 text-blue-700 font-bold border border-blue-105/40"
-                : "text-slate-600 hover:bg-slate-105/50 hover:text-slate-900"
-            }`}
-          >
-            <Key className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>Portal Akun & Registrasi</span>
-          </button>
+          {currentUser === null && (
+            <button
+              onClick={() => {
+                setCurrentTab("portal");
+                if (isMobile) setIsMobileSidebarOpen(false);
+              }}
+              className={`w-full text-left rounded-lg px-3.5 py-3 text-xs font-semibold flex items-center gap-3 transition-colors cursor-pointer select-none ${
+                currentTab === "portal"
+                  ? "bg-blue-50/80 text-blue-700 font-bold border border-blue-105/40"
+                  : "text-slate-600 hover:bg-slate-105/50 hover:text-slate-900"
+              }`}
+            >
+              <Key className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Portal Akun & Registrasi</span>
+            </button>
+          )}
 
-          {(currentUser?.role === "awardee" || simulatedRole === "awardee") && (
+          {currentUser !== null && (
             <button
               onClick={() => {
                 setCurrentTab("myProfile");
@@ -1033,7 +1180,7 @@ export default function App() {
               }`}
             >
               <UserIcon className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Profil Saya (Info & Foto)</span>
+              <span>Profil Saya {simulatedRole === "admin" || simulatedRole === "fasilitator" || simulatedRole === "kepala_asrama" ? "(Staf/Pengurus)" : "(Info & Foto)"}</span>
             </button>
           )}
 
@@ -1215,6 +1362,19 @@ export default function App() {
                   currentRole={simulatedRole}
                   currentUserId={simulatedUserId}
                   onNavigateToTab={(tab) => setCurrentTab(tab)}
+                  users={users}
+                />
+              )}
+
+              {currentTab === "achievements" && (
+                <AwardeeAchievements 
+                  achievements={achievements}
+                  onAddAchievement={handleAddAchievement}
+                  onDeleteAchievement={handleDeleteAchievement}
+                  onUpdateAchievement={handleUpdateAchievement}
+                  currentRole={simulatedRole}
+                  awardees={awardees}
+                  currentUserProfile={currentUserProfile}
                 />
               )}
 
@@ -1272,6 +1432,13 @@ export default function App() {
                   currentRole={simulatedRole}
                   onNavigateToTab={(tab) => setCurrentTab(tab)}
                   batches={batches}
+                  activities={activities}
+                  currentUser={currentUser}
+                  userPasswords={userPasswords}
+                  onChangePassword={handleChangePassword}
+                  onForgotPassword={handleForgotPassword}
+                  onLogout={handleLogout}
+                  onUpdateUser={handleUpdateUser}
                 />
               )}
 

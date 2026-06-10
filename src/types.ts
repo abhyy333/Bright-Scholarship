@@ -11,6 +11,8 @@ export interface User {
   email: string;
   role: UserRole;
   createdAt?: string;
+  graduationYear?: string; // Optional field for fasilitator/kepala_asrama
+  batchYear?: string; // Optional field for fasilitator/kepala_asrama
 }
 
 export interface AwardeeProfile {
@@ -104,6 +106,20 @@ export interface QrisCampaign {
   qrCodeUrl?: string;
   colorTheme: string;
   active: boolean;
+}
+
+export interface AwardeeAchievement {
+  achievementId: string;
+  awardeeId: string;
+  awardeeName: string;
+  title: string; // e.g., "Juara 1 MTQ Nasional 2026"
+  category: "Akademik" | "Non-Akademik" | "Inovasi & Riset" | "Sosial Kemasyarakatan";
+  date: string; // YYYY-MM-DD
+  description: string;
+  imageUrl?: string; // photo proof
+  batch: string; // e.g., "9"
+  university: string;
+  isHidden?: boolean;
 }
 
 

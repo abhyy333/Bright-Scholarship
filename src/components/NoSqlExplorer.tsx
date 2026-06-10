@@ -99,7 +99,7 @@ export default function NoSqlExplorer() {
       whyNoSQL: "Alih-alih memanggil query hitung (O(N) reads) setiap kali pengunjung membuka website (yang memperbesar biaya Firestore), agregasi di-cache secara otomatis dalam 1 dokumen tunggal. Hanya menyita 1 kali baca dokumen per sesi kunjungan (O(1) read).",
       fields: [
         { name: "statId", type: "String", desc: "Paling umum bernilai 'global_analytics'." },
-        { name: "totalAwardeesCount", type: "Number", desc: "Total kuantitas awardees aktif berbeasiswa." },
+        { name: "totalAwardeesCount", type: "Number", desc: "Total kuantitas awardees aktif." },
         { name: "totalActivitiesCount", type: "Number", desc: "Mencatat jumlah inisiatif asrama yang telah rampung." },
         { name: "totalServiceHours", type: "Number", desc: "Akumulasi jam pengabdian dan pembinaan seluruh awardee." },
         { name: "pembinaanHours", type: "Number", desc: "Total jam khusus pengembangan karakter & mentoring asrama." },
@@ -212,7 +212,7 @@ service cloud.firestore {
         <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/80">
           <div className="text-emerald-400 font-bold font-mono text-sm mb-1.5">03. Aturan Proteksi (ABAC)</div>
           <p className="text-[12px] text-slate-400">
-            Melarang keras modifikasi IPK atau Penambahan jam pelayanan sosial mandiri oleh awardee. Memperbolehkan awardee memperbarui keterampilan/social links-nya sendiri secara fleksibel dengan validasi ketat dari server-side.
+            Melarang keras modifikasi IPK atau Penambahan jam pembinaan mandiri oleh awardee. Memperbolehkan awardee memperbarui keterampilan/social links-nya sendiri secara fleksibel dengan validasi ketat dari server-side.
           </p>
         </div>
       </div>
@@ -245,7 +245,7 @@ service cloud.firestore {
           <div className="bg-slate-900 border border-slate-700 p-3 rounded-lg w-full max-w-[200px]">
             <div className="text-slate-300 font-bold">Koleksi: /impact_stats</div>
             <div className="text-[10px] text-slate-400 mt-1">Doc: 'global_analytics'</div>
-            <div className="text-slate-500 text-[10px] mt-1">Cache Total Jam Pengabdian</div>
+            <div className="text-slate-500 text-[10px] mt-1">Cache Total Waktu Pembinaan</div>
           </div>
         </div>
       </div>

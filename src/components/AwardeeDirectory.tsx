@@ -16,7 +16,7 @@ import {
   Calendar,
   Search
 } from "lucide-react";
-import { AwardeeProfile, UserRole } from "../types";
+import { AwardeeProfile, UserRole, User } from "../types";
 
 interface AwardeeDirectoryProps {
   awardees: AwardeeProfile[];
@@ -24,9 +24,10 @@ interface AwardeeDirectoryProps {
   currentRole: UserRole;
   currentUserId: string;
   onNavigateToTab?: (tab: string) => void;
+  users?: User[];
 }
 
-export default function AwardeeDirectory({ awardees, onUpdateAwardee, currentRole, currentUserId, onNavigateToTab }: AwardeeDirectoryProps) {
+export default function AwardeeDirectory({ awardees, onUpdateAwardee, currentRole, currentUserId, onNavigateToTab, users = [] }: AwardeeDirectoryProps) {
   const [selectedAwardee, setSelectedAwardee] = useState<AwardeeProfile | null>(awardees[0] || null);
   const [isEditing, setIsEditing] = useState(false);
   const [newSkillText, setNewSkillText] = useState("");
@@ -39,44 +40,16 @@ export default function AwardeeDirectory({ awardees, onUpdateAwardee, currentRol
   const [simulationAlert, setSimulationAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterBatch, setFilterBatch] = useState("All");
-  const [filterUniversity, setFilterUniversity] = useState("All");
-  const [filterMajor, setFilterMajor] = useState("All");
-
-  // Dynamic filter options extracted from existing awardees list
-  const universitiesList = Array.from(new Set(awardees.map(a => a.university))).filter(Boolean);
-  const majorsList = Array.from(new Set(awardees.map(a => a.major))).filter(Boolean);
-  const batchesList = Array.from(new Set(awardees.map(a => a.batch))).filter(Boolean).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
   const filteredAwardees = awardees.filter((awardee) => {
-    // 1. Search Query Search bounds
     const query = searchQuery.toLowerCase().trim();
-    if (query) {
-      const matchesQuery = (
-        awardee.name.toLowerCase().includes(query) ||
-        awardee.university.toLowerCase().includes(query) ||
-        awardee.major.toLowerCase().includes(query) ||
-        awardee.skills.some(skill => skill.toLowerCase().includes(query))
-      );
-      if (!matchesQuery) return false;
-    }
-
-    // 2. Batch Filter bounds
-    if (filterBatch !== "All" && awardee.batch !== filterBatch) {
-      return false;
-    }
-
-    // 3. University Filter bounds
-    if (filterUniversity !== "All" && awardee.university !== filterUniversity) {
-      return false;
-    }
-
-    // 4. Major Filter bounds
-    if (filterMajor !== "All" && awardee.major !== filterMajor) {
-      return false;
-    }
-
-    return true;
+    if (!query) return true;
+    return (
+      awardee.name.toLowerCase().includes(query) ||
+      awardee.university.toLowerCase().includes(query) ||
+      awardee.major.toLowerCase().includes(query) ||
+      awardee.skills.some(skill => skill.toLowerCase().includes(query))
+    );
   });
 
   // Buffer state for the edit form
@@ -211,7 +184,7 @@ export default function AwardeeDirectory({ awardees, onUpdateAwardee, currentRol
 
 #### A. EVALUASI AKADEMIS DAN INTEGRITAS DIRI
 Mahasiswa menunjukkan performa akademis yang cemerlang dengan raihan **IPK ${selectedAwardee.gpa}** di **${selectedAwardee.university}**. Ini mencerminkan keseimbangan kognitif yang kokoh. 
-Lebih lanjut, keterlibatan aktif sepanjang **${selectedAwardee.totalServiceHours} Jam Pengabdian** membuktikan kedalaman empati sosial dan komitmen asrama yang tinggi dalam membumikan ilmunya secara langsung bagi masyarakat akar rumput.
+Lebih lanjut, keterlibatan aktif sepanjang **${selectedAwardee.totalServiceHours} Jam Pembinaan** membuktikan kedalaman empati sosial dan komitmen asrama yang tinggi dalam membumikan ilmunya secara langsung bagi masyarakat akar rumput.
 
 #### B. STRATEGI RELEVANSI INDUSTRI & PENGEMBANGAN SKILLS
 Sebagai mahasiswa rumpun **${selectedAwardee.major}**, paduan keterampilan teknis Anda (*${selectedAwardee.skills.slice(0, 3).join(", ") || "Keorganisasian"}*) sangat prospektif dalam lingkup profesional masa depan. Untuk bersaing kuat:
@@ -250,90 +223,29 @@ Berdasarkan program studi Anda, diusulkan 2 proyek sosial berkelanjutan (social 
         </div>
 
         {/* Search input bar */}
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs">
-          <div className="relative animate-fadeIn">
+        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-xs">
+          <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
             <input
               type="text"
               placeholder="Cari nama, universitas, jurusan, atau keahlian..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-100 outline-none text-slate-800 placeholder-slate-400 transition-all font-sans"
+              className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-100 outline-none text-slate-800 placeholder-slate-400 transition-all font-sans text-left"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-2.5 p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer select-none"
+                className="absolute right-2.5 top-2.5 p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-650 transition-colors cursor-pointer select-none border-0 bg-transparent flex items-center justify-center animate-fadeIn"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
-
-          {/* Triple Category filters layout (User Intent requirement) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100 text-left">
-            <div className="space-y-1">
-              <label className="text-[10px] font-extrabold text-slate-500 uppercase block tracking-wider">Angkatan</label>
-              <select
-                value={filterBatch}
-                onChange={(e) => setFilterBatch(e.target.value)}
-                className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded text-[11px] text-slate-700 font-bold focus:bg-white focus:border-emerald-500 outline-none cursor-pointer"
-              >
-                <option value="All">Semua Angkatan</option>
-                {batchesList.map(b => (
-                  <option key={b} value={b}>Angkatan {b}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[10px] font-extrabold text-slate-500 uppercase block tracking-wider">Universitas</label>
-              <select
-                value={filterUniversity}
-                onChange={(e) => setFilterUniversity(e.target.value)}
-                className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded text-[11px] text-slate-700 font-bold focus:bg-white focus:border-emerald-500 outline-none cursor-pointer truncate"
-              >
-                <option value="All">Semua Kampus</option>
-                {universitiesList.map(u => (
-                  <option key={u} value={u}>{u}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[10px] font-extrabold text-slate-500 uppercase block tracking-wider">Jurusan (Major)</label>
-              <select
-                value={filterMajor}
-                onChange={(e) => setFilterMajor(e.target.value)}
-                className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded text-[11px] text-slate-700 font-bold focus:bg-white focus:border-emerald-500 outline-none cursor-pointer truncate"
-              >
-                <option value="All">Semua Jurusan</option>
-                {majorsList.map(m => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {(searchQuery || filterBatch !== "All" || filterUniversity !== "All" || filterMajor !== "All") && (
-            <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500 font-semibold font-sans bg-amber-50/50 p-2 border border-amber-205 rounded-lg animate-fadeIn text-left">
-              <span>Menampilkan {filteredAwardees.length} dari {awardees.length} awardee</span>
-              <button 
-                type="button"
-                onClick={() => {
-                  setSearchQuery("");
-                  setFilterBatch("All");
-                  setFilterUniversity("All");
-                  setFilterMajor("All");
-                }}
-                className="text-blue-600 hover:underline cursor-pointer font-extrabold"
-              >
-                Reset Filter
-              </button>
-            </div>
-          )}
         </div>
+
+
 
         {/* Small selection grid */}
         <div className="space-y-2.5">
@@ -368,14 +280,30 @@ Berdasarkan program studi Anda, diusulkan 2 proyek sosial berkelanjutan (social 
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1.5">
-                      <span className="font-extrabold text-xs text-blue-950 truncate font-sans block">{awardee.name}</span>
+                      <span className="font-extrabold text-xs text-blue-950 truncate font-sans block flex items-center gap-1.5">
+                        <span className="truncate">{awardee.name}</span>
+                        {(() => {
+                          const userMatch = users.find(u => u.uid === awardee.awardeeId || u.name.toLowerCase() === awardee.name.toLowerCase());
+                          if (userMatch?.role === "fasilitator") {
+                            return (
+                              <span className="px-1.5 py-0.2 bg-indigo-50 border border-indigo-200 text-indigo-700 text-[8px] font-black rounded-full shrink-0 uppercase tracking-wider">Fasilitator</span>
+                            );
+                          }
+                          if (userMatch?.role === "kepala_asrama") {
+                            return (
+                              <span className="px-1.5 py-0.2 bg-amber-50 border border-amber-250 text-amber-800 text-[8px] font-black rounded-full shrink-0 uppercase tracking-wider">K-Asrama</span>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </span>
                       <span className="text-[10px] font-mono text-emerald-600 font-extrabold shrink-0">IPK {awardee.gpa}</span>
                     </div>
                     <span className="text-[11px] text-slate-600 font-medium truncate block font-sans">{awardee.university}</span>
                     <div className="flex items-center gap-1.5 mt-1.5 text-[9px] font-mono text-slate-500 font-bold">
                       <span>{awardee.batch}</span>
                       <span>•</span>
-                      <span className="text-amber-600">{awardee.totalServiceHours} Jam Pengabdian</span>
+                      <span className="text-amber-600">{awardee.totalServiceHours} Jam Pembinaan</span>
                     </div>
                   </div>
                 </button>
@@ -425,6 +353,24 @@ Berdasarkan program studi Anda, diusulkan 2 proyek sosial berkelanjutan (social 
                       <span className="text-[10px] bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded font-bold font-mono uppercase">
                         {selectedAwardee.status === "active" ? "Aktif" : "Alumni"}
                       </span>
+                      {(() => {
+                        const userMatch = users.find(u => u.uid === selectedAwardee.awardeeId || u.name.toLowerCase() === selectedAwardee.name.toLowerCase());
+                        if (userMatch?.role === "fasilitator") {
+                          return (
+                            <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-extrabold rounded-full uppercase tracking-wide shadow-xs">
+                              Fasilitator Akademik
+                            </span>
+                          );
+                        }
+                        if (userMatch?.role === "kepala_asrama") {
+                          return (
+                            <span className="px-2 py-0.5 bg-amber-50 border border-amber-250 text-amber-800 text-[10px] font-extrabold rounded-full uppercase tracking-wide shadow-xs">
+                              Kepala Asrama
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                     <p className="text-slate-700 text-xs font-medium flex items-center justify-center sm:justify-start gap-1">
                       <GraduationCap className="w-3.5 h-3.5 text-emerald-600" />
@@ -435,7 +381,7 @@ Berdasarkan program studi Anda, diusulkan 2 proyek sosial berkelanjutan (social 
                       <span>|</span>
                       <span className="text-emerald-600 font-extrabold">IPK: {selectedAwardee.gpa}</span>
                       <span>|</span>
-                      <span className="text-amber-650 text-amber-600">Total: {selectedAwardee.totalServiceHours} Jam Pengabdian</span>
+                      <span className="text-amber-650 text-amber-600">Total: {selectedAwardee.totalServiceHours} Jam Pembinaan</span>
                     </div>
                   </div>
                 </div>
@@ -638,7 +584,7 @@ Berdasarkan program studi Anda, diusulkan 2 proyek sosial berkelanjutan (social 
                   {/* Service Hours (SYSTEM / ADMIN ONLY!) */}
                   <div className="space-y-1">
                     <div className="flex justify-between items-center">
-                      <label className="text-slate-600 font-bold block text-[11px]">Jam Pelayanan Sosial *</label>
+                      <label className="text-slate-600 font-bold block text-[11px]">Jam Pembinaan *</label>
                       <span className="text-[9px] font-mono font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 rounded uppercase font-sans">System Only</span>
                     </div>
                     <input 

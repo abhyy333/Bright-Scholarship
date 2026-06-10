@@ -26,7 +26,6 @@ export default function AiCompiler({ awardees, activities }: AiCompilerProps) {
 
   const totalAwardees = awardees.length;
   const totalActivities = activities.length;
-  const dynamicTotalHours = awardees.reduce((sum, awardee) => sum + awardee.totalServiceHours, 0);
 
   // Aggregate stats
   const categoryStats = activities.reduce(
@@ -44,8 +43,8 @@ export default function AiCompiler({ awardees, activities }: AiCompilerProps) {
     { pembinaan: 0, pengabdian: 0, pembedayaanLain: 0 }
   );
 
-  const averageHoursPerAwardee = totalAwardees > 0 ? (dynamicTotalHours / totalAwardees).toFixed(1) : "0";
-  const benchmarkPercentage = Math.min(100, Math.round((parseFloat(averageHoursPerAwardee) / 35) * 100));
+  const averagePembinaanHours = totalAwardees > 0 ? (categoryStats.pembinaan / totalAwardees).toFixed(1) : "0";
+  const benchmarkPercentage = Math.min(100, Math.round((parseFloat(averagePembinaanHours) / 15) * 100));
 
   const handleGenerateAiReport = async () => {
     setIsAiLoading(true);
@@ -61,7 +60,7 @@ export default function AiCompiler({ awardees, activities }: AiCompilerProps) {
         body: JSON.stringify({
           totalAwardees,
           totalActivities,
-          totalHours: dynamicTotalHours,
+          totalHours: categoryStats.pembinaan,
           pembinaanHours: categoryStats.pembinaan,
           pengabdianHours: categoryStats.pengabdian + categoryStats.pembedayaanLain,
           activityCategories: {
@@ -97,9 +96,9 @@ export default function AiCompiler({ awardees, activities }: AiCompilerProps) {
 *(Disintesis otomatis melalui YBM BRILiaN AI Framework)*
 
 #### 1. REKAPITULASI KUANTITATIF & KUALITATIF EFFORT
-Hingga saat ini, dengan total penerima manfaat aktif sebanyak **${totalAwardees} Mahasiswa** binaan yang berkuliah di berbagai Universitas Negeri Terkemuka di Indonesia, program asrama Bright Scholarship berhasil mencatatkan akumulasi riil sebesar **${dynamicTotalHours} Jam Kontribusi Sosial**.
+Hingga saat ini, dengan total penerima manfaat aktif sebanyak **${totalAwardees} Mahasiswa** binaan yang berkuliah di berbagai Universitas Negeri Terkemuka di Indonesia, program asrama Bright Scholarship berhasil mencatatkan akumulasi riil sebesar **${categoryStats.pembinaan} Jam Waktu Pembinaan**.
 
-Rasio rata-rata jam kontribusi per individu menyentuh angka **${averageHoursPerAwardee} Jam**, melampaui standar semesteran sebesar 14%. Sinergi program ini terbagi menjadi dua pilar esensial asrama:
+Rasio rata-rata waktu pembinaan per individu menyentuh angka **${averagePembinaanHours} Jam**, melampaui standar semesteran sebesar 14%. Sinergi program ini terbagi menjadi dua pilar esensial asrama:
 *   **Pembinaan Akademik & Keagamaan (${categoryStats.pembinaan} jam):** Pembentukan keimanan, kepemimpinan, tahfidz Al-Quran, dan mentoring karakter terstruktur.
 *   **Aksi Nyata & Pengabdian Masyarakat (${categoryStats.pengabdian + categoryStats.pembedayaanLain} jam):** Transfer pemahaman sains, teknologi informasi, ekonomi kreatif, dan pelapisan infrastruktur mikro secara langsung ke masyarakat.
 
@@ -168,12 +167,8 @@ Untuk memperluas magnitudo dampak sosial di masa berkala, direkomendasikan strat
                 <span className="text-slate-900 font-extrabold text-xs">{totalActivities}</span>
               </div>
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-center justify-between">
-                <span className="text-slate-500 text-xs">Jam Kontribusi:</span>
-                <span className="text-slate-950 font-extrabold text-xs">{dynamicTotalHours} Jam</span>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-100 flex items-center justify-between">
-                <span className="text-slate-500 text-xs">Rasio Keaktifan:</span>
-                <span className="text-emerald-700 font-extrabold text-xs">{averageHoursPerAwardee} jam/mhs</span>
+                <span className="text-slate-500 text-xs">Waktu Pembinaan Rata-rata:</span>
+                <span className="text-emerald-700 font-extrabold text-xs">{averagePembinaanHours} jam/mhs</span>
               </div>
             </div>
 

@@ -346,16 +346,20 @@ export default function BrightDashboard({
   // Dynamic calculations based on state to ensure structural coherence!
   const totalAwardees = awardees.length;
   const totalActivities = activities.length;
-  
-  // Calculate aggregate service hours directly from real-time awardee records
-  const dynamicTotalHours = awardees.reduce((sum, awardee) => sum + awardee.totalServiceHours, 0);
 
-  // Aggregate hours by category for high fidelity dashboard visualization
+  const isStaff = simulatedRole === "admin" || simulatedRole === "fasilitator" || simulatedRole === "kepala_asrama";
+  const activeAwardeeId = currentUserProfile?.awardeeId || "awardee-1";
+
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  // Cumulative program-wide statistics (sum of hours across all students)
   const categoryStats = activities.reduce(
     (acc, act) => {
       const hours = act.hoursEarned * act.awardeesInvolved.length;
       if (act.category === "Pembinaan") {
-        acc.pembinaan += hours;
+        if (act.date <= todayStr) {
+          acc.pembinaan += hours;
+        }
       } else if (act.category === "Pengabdian Masyarakat") {
         acc.pengabdian += hours;
       } else {
@@ -366,8 +370,39 @@ export default function BrightDashboard({
     { pembinaan: 0, pengabdian: 0, pembedayaanLain: 0 }
   );
 
-  const averageHoursPerAwardee = totalAwardees > 0 ? (dynamicTotalHours / totalAwardees).toFixed(1) : "0";
-  const benchmarkPercentage = Math.min(100, Math.round((parseFloat(averageHoursPerAwardee) / 35) * 100)); // Target 35 hours benchmark
+  // Total unique events duration hours (without multiplying by students involved)
+  const totalAllPembinaanEventsHours = activities
+    .filter(a => a.category === "Pembinaan" && a.date <= todayStr)
+    .reduce((sum, act) => sum + act.hoursEarned, 0);
+
+  // Individual awardee statistics (only things they actually participated in)
+  const myParticipatedActivities = activities.filter(act => 
+    act.awardeesInvolved.includes(activeAwardeeId)
+  );
+
+  const myPembinaanHours = myParticipatedActivities
+    .filter(act => act.category === "Pembinaan" && act.date <= todayStr)
+    .reduce((sum, act) => sum + act.hoursEarned, 0);
+
+  const myPengabdianHours = myParticipatedActivities
+    .filter(act => act.category === "Pengabdian Masyarakat")
+    .reduce((sum, act) => sum + act.hoursEarned, 0);
+
+  const myPembedayaanLainHours = myParticipatedActivities
+    .filter(act => act.category !== "Pembinaan" && act.category !== "Pengabdian Masyarakat")
+    .reduce((sum, act) => sum + act.hoursEarned, 0);
+
+  // Determine hours to display based on actor role
+  const displayedPembinaanHours = isStaff ? categoryStats.pembinaan : myPembinaanHours;
+  const displayedPengabdianHours = isStaff ? categoryStats.pengabdian : myPengabdianHours;
+  const displayedPembedayaanLainHours = isStaff ? categoryStats.pembedayaanLain : myPembedayaanLainHours;
+
+  const averagePembinaanHours = totalAwardees > 0 ? (categoryStats.pembinaan / totalAwardees).toFixed(1) : "0";
+  const benchmarkPercentage = isStaff 
+    ? Math.min(100, Math.round((parseFloat(averagePembinaanHours) / 15) * 100))
+    : Math.min(100, Math.round((myPembinaanHours / 15) * 100));
+  
+  const dynamicTotalHours = awardees.reduce((sum, awardee) => sum + awardee.totalServiceHours, 0);
 
   // Request AI Summary from server backend via Express + Gemini
   const handleGenerateAiReport = async () => {
@@ -384,7 +419,7 @@ export default function BrightDashboard({
         body: JSON.stringify({
           totalAwardees,
           totalActivities,
-          totalHours: dynamicTotalHours,
+          totalHours: categoryStats.pembinaan,
           pembinaanHours: categoryStats.pembinaan,
           pengabdianHours: categoryStats.pengabdian + categoryStats.pembedayaanLain,
           activityCategories: {
@@ -415,9 +450,9 @@ export default function BrightDashboard({
 *(Laporan ini disinkronkan secara semi-otomatis lewat Analitik Berbasis Aturan Klien)*
 
 #### 1. ANALISIS KUANTITATIF & KUALITATIF SINERGI DAMPAK
-Dengan total penerima manfaat sebanyak **${totalAwardees} Mahasiswa** yang tersebar di universitas-universitas terkemuka, program Bright Scholarship telah sukses merealisasikan akumulasi sebanyak **${dynamicTotalHours} Jam Kontribusi Sosial**.
+Dengan total penerima manfaat sebanyak **${totalAwardees} Mahasiswa** yang tersebar di universitas-universitas terkemuka, program Bright Scholarship telah sukses merealisasikan akumulasi sebanyak **${categoryStats.pembinaan} Jam Waktu Pembinaan**.
 
-Rasio rata-rata jam kontribusi per awardee menyentuh angka **${averageHoursPerAwardee} Jam**, melampaui standar semesteran sebesar 14%. Sinergi program ini terbagi menjadi dua elemen fundamental asrama:
+Rasio rata-rata waktu pembinaan per awardee menyentuh angka **${averagePembinaanHours} Jam**, melampaui standar semesteran sebesar 14%. Sinergi program ini terbagi menjadi dua elemen fundamental asrama:
 *   **Pembinaan (${categoryStats.pembinaan} jam):** Biasanya kegiatannya berupa pembinaan karakter, tahfidz quran, pembinaan soft skill, dan kegiatan sosial.
 *   **Pengabdian Masyarakat Aktif (${categoryStats.pengabdian + categoryStats.pembedayaanLain} jam):** Penyaluran keahlian teknik, sains, dan humaniora riil ke pedesaan marginal.
 
@@ -427,7 +462,7 @@ Rasio rata-rata jam kontribusi per awardee menyentuh angka **${averageHoursPerAw
 *   **Value for Corporate/Donors (Dampak Kepercayaan Donatur):** Transparansi akuntabilitas luaran kontribusi sosial (setiap jam teraudit dengan bukti logbook) memperkuat nilai retensi investasi donatur.
 
 #### 3. REKOMENDASI TAKTIS STRATEGI PROGRAM TAJAM DAMPAK (TAHUN AJARAN BARU)
-Untuk memaksimalkan utilitas jam kontribusi mahasiswa, diusulkan 3 inisiatif taktis berikut:
+Untuk memaksimalkan utilitas jam pembinaan mahasiswa, diusulkan 3 inisiatif taktis berikut:
 1.  **Inkubasi Bright-Village:** Menetapkan satu desa binaan tetap per wilayah asrama untuk proyek terintegrasi (pendidikan + elektrifikasi).
 2.  **Digital Skills Peer-to-Peer:** Menyalurkan kompetensi anak-anak IT/Elektro asrama untuk pelatihan literasi komputer di panti asuhan lokal.
 3.  **Forum Kolokium Nasional:** Menyelenggarakan bedah kasus inklusi sosial antar asrama se-Indonesia guna menajamkan wawasan kritis awardee.
@@ -470,11 +505,11 @@ Untuk memaksimalkan utilitas jam kontribusi mahasiswa, diusulkan 3 inisiatif tak
       </div>
 
       {/* Stats Cards Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Metric 1 */}
         <div className="bg-white border border-slate-200/85 p-5 rounded-xl flex items-center justify-between shadow-xs">
           <div className="space-y-1">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block font-sans">Awardee Berbeasiswa</span>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block font-sans">Total Awardee Aktif</span>
             <div className="text-3xl font-extrabold text-blue-950 font-mono">{totalAwardees}</div>
             <span className="text-[10px] text-emerald-600 font-bold font-sans flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
@@ -500,25 +535,15 @@ Untuk memaksimalkan utilitas jam kontribusi mahasiswa, diusulkan 3 inisiatif tak
           </div>
         </div>
 
-        {/* Metric 3 */}
-        <div className="bg-white border border-slate-200/85 p-5 rounded-xl flex items-center justify-between shadow-xs">
-          <div className="space-y-1">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block font-sans">Total Jam Pelayanan</span>
-            <div className="text-3xl font-extrabold text-blue-950 font-mono">{dynamicTotalHours}</div>
-            <span className="text-[10px] text-amber-600 font-bold font-sans flex items-center gap-1">
-              Akumulatif seluruh asrama
-            </span>
-          </div>
-          <div className="w-11 h-11 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center">
-            <Clock className="w-5 h-5 text-amber-600" />
-          </div>
-        </div>
-
-        {/* Metric 4 */}
+        {/* Metric 3 - Waktu Pembinaan */}
         <div className="bg-white border border-slate-200/85 p-5 rounded-xl shadow-xs">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block font-sans">Rata-rata Jam Individu</span>
-            <span className="text-xs font-extrabold text-blue-950 font-mono">{averageHoursPerAwardee} h</span>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block font-sans">
+              {isStaff ? "Total Jam Pembinaan (Program)" : "Waktu Pembinaan Saya"}
+            </span>
+            <span className="text-xs font-extrabold text-blue-950 font-mono">
+              {isStaff ? `${displayedPembinaanHours} Jam (${averagePembinaanHours}/mhs)` : `${displayedPembinaanHours} Jam`}
+            </span>
           </div>
           <div className="w-full bg-slate-100 rounded-full h-1.5 mb-1.5 overflow-hidden">
             <div 
@@ -527,20 +552,22 @@ Untuk memaksimalkan utilitas jam kontribusi mahasiswa, diusulkan 3 inisiatif tak
             ></div>
           </div>
           <div className="flex justify-between items-center text-[9px] text-slate-500 font-bold">
-            <span>Target: 35 jam</span>
+            <span>{isStaff ? "Rata-rata Target: 15 jam" : "Target Kelulusan: 15 jam"}</span>
             <span className="text-emerald-600 font-extrabold">{benchmarkPercentage}% Tercapai</span>
           </div>
         </div>
       </div>
 
-      {/* Sinergi Kontribusi & AI Report Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left: Synthesis visual metrics ratios */}
-        <div className="lg:col-span-4 bg-white border border-slate-200/85 rounded-xl p-5 md:p-6 space-y-5 flex flex-col justify-between shadow-xs">
+      {/* Sinergi Kontribusi Panel */}
+      <div className="w-full">
+        {/* Synthesis visual metrics ratios */}
+        <div className="w-full bg-white border border-slate-200/85 rounded-xl p-5 md:p-6 space-y-5 flex flex-col justify-between shadow-xs">
           <div>
-            <h3 className="text-base font-extrabold text-blue-950 mb-1.5 font-sans">Sinergi Pembinaan & Pengabdian</h3>
+            <h3 className="text-base font-extrabold text-blue-950 mb-1.5 font-sans">
+              {isStaff ? "Sinergi Pembinaan & Pengabdian Asrama" : "Sinergi Pembinaan & Pengabdian Saya"}
+            </h3>
             <p className="text-slate-500 text-xs leading-relaxed">
-              Keseimbangan antara penempaan moral-karakter di asrama dengan pengabdian sosial konkret di lapangan.
+              Keseimbangan antara penempaan moral-karakter internal asrama dengan penyaluran empati sosial konkret di lapangan.
             </p>
           </div>
 
@@ -551,18 +578,20 @@ Untuk memaksimalkan utilitas jam kontribusi mahasiswa, diusulkan 3 inisiatif tak
               <div className="flex justify-between text-xs">
                 <span className="font-semibold text-slate-700 flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 bg-blue-600 rounded-full block"></span>
-                  Pembinaan
+                  {isStaff ? "Total Pembinaan Karakter" : "Pembinaan Karakter Saya"}
                 </span>
-                <span className="font-mono text-slate-600 font-semibold">{categoryStats.pembinaan} Jam</span>
+                <span className="font-mono text-slate-600 font-semibold">{displayedPembinaanHours} Jam</span>
               </div>
               <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                 <div 
-                  style={{ width: `${Math.min(100, Math.round((categoryStats.pembinaan / (dynamicTotalHours || 1)) * 100))}%` }}
+                  style={{ width: `${Math.min(100, Math.round((displayedPembinaanHours / (displayedPembinaanHours + displayedPengabdianHours + displayedPembedayaanLainHours || 1)) * 100))}%` }}
                   className="bg-blue-600 h-full rounded-full"
                 ></div>
               </div>
               <p className="text-[10px] text-slate-500 leading-normal font-sans">
-                Biasanya meliputi pembinaan karakter, tahfidz quran, pembinaan soft skill, dan kegiatan sosial.
+                {isStaff 
+                  ? "Meliputi pembinaan karakter mingguan, tahfidz quran, pembinaan soft skill, dan mentoring asrama yang dihadiri oleh seluruh awardee." 
+                  : "Sesi pembinaan karakter mingguan, mentoring tahfidz Al-Quran harian, dan kegiatan internal asrama yang Anda hadiri secara aktif."}
               </p>
             </div>
 
@@ -571,333 +600,27 @@ Untuk memaksimalkan utilitas jam kontribusi mahasiswa, diusulkan 3 inisiatif tak
               <div className="flex justify-between text-xs">
                 <span className="font-semibold text-slate-700 flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 bg-amber-500 rounded-full block"></span>
-                  Capacity Building & Lainnya
+                  {isStaff ? "Total Pengabdian & Capacity Building" : "Pengabdian & Capacity Building Saya"}
                 </span>
-                <span className="font-mono text-slate-600 font-semibold">{categoryStats.pembedayaanLain} Jam</span>
+                <span className="font-mono text-slate-600 font-semibold">{displayedPengabdianHours + displayedPembedayaanLainHours} Jam</span>
               </div>
               <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                 <div 
-                  style={{ width: `${Math.min(100, Math.round((categoryStats.pembedayaanLain / (dynamicTotalHours || 1)) * 105))}%` }}
+                  style={{ width: `${Math.min(100, Math.round(((displayedPengabdianHours + displayedPembedayaanLainHours) / (displayedPembinaanHours + displayedPengabdianHours + displayedPembedayaanLainHours || 1)) * 100))}%` }}
                   className="bg-amber-500 h-full rounded-full"
                 ></div>
               </div>
+              <p className="text-[10px] text-slate-500 leading-normal font-sans">
+                {isStaff
+                  ? "Mengukur realisasi jam kerja sosial, sukarelawan kemanusiaan, serta pelatihan kepemimpinan sekunder di lapangan."
+                  : "Jam pengabdian sosial sukarela di lapangan serta kegiatan pelatihan kepemimpinan yang Anda ikuti langsung luar asrama."}
+              </p>
             </div>
           </div>
 
           <div className="pt-4 border-t border-slate-100 text-[11px] text-slate-500 space-y-1 leading-normal">
             <div>💡 <span className="font-extrabold text-blue-950">Prinsip Asrama:</span></div>
             <p>Seorang pemimpin sejati wajib mengimbangi kematangan akademik internal dengan kepekaan eksternal membantu lingkungan sekitar.</p>
-          </div>
-        </div>
-
-        {/* Right: Mading Pengumuman & Timeline Kegiatan */}
-        <div id="mading-qris-pemberdayaan" className="lg:col-span-8 bg-white border border-slate-200/85 rounded-xl p-5 md:p-6 space-y-5 shadow-xs flex flex-col">
-          
-          {/* Header & Sub-Tab Navigation */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-3">
-            <div className="space-y-1 text-left">
-              <h3 className="text-base font-extrabold text-blue-950 font-sans flex items-center gap-2">
-                <Megaphone className="w-4 h-4 text-emerald-500" />
-                Mading Digital & Informasi Pemberdayaan
-              </h3>
-              <p className="text-slate-500 text-xs leading-normal">
-                Media kolaborasi pengumuman penting, manajemen informasi, dan galeri linimasa program riil asrama.
-              </p>
-            </div>
-
-            {/* Sub-tab Pill Selectors */}
-            <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/50 self-start sm:self-auto shrink-0 animate-fadeIn">
-              <button
-                onClick={() => setDashboardSubTab("posts")}
-                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                  dashboardSubTab === "posts" 
-                    ? "bg-white text-blue-950 shadow-xs" 
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                Info & Kegiatan
-              </button>
-              <button
-                onClick={() => setDashboardSubTab("timeline")}
-                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                  dashboardSubTab === "timeline" 
-                    ? "bg-white text-blue-950 shadow-xs" 
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                Timeline & Riwayat Kegiatan
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1">
-            {/* 1. INFO & KEGIATAN TAB */}
-            {dashboardSubTab === "posts" && (
-              <div className="space-y-4">
-                
-                {/* Facilitator & Dorm Head Management Action */}
-                {(simulatedRole === "admin" || simulatedRole === "fasilitator" || simulatedRole === "kepala_asrama") && (
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] bg-amber-50 text-amber-800 font-extrabold border border-amber-200 px-2 py-0.5 rounded-full uppercase font-mono tracking-wider">
-                        Hak Akses Pengurus Aktif
-                      </span>
-                      <button
-                        onClick={() => setShowAddPostForm(!showAddPostForm)}
-                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-xs font-bold select-none cursor-pointer flex items-center gap-1.5 transition-all shadow-xs"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        {showAddPostForm ? "Sembunyikan Form" : "Unggah Info Utama / Kegiatan"}
-                      </button>
-                    </div>
-
-                    {showAddPostForm && (
-                      <form onSubmit={handleAddInfoPost} className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-3 animate-fadeIn my-1.5 text-left">
-                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide font-sans">Publikasikan Pengumuman Baru</h4>
-                        
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label className="block text-[10px] font-bold text-slate-600">Judul Postingan / Kegiatan</label>
-                            <input
-                              type="text"
-                              value={newPostTitle}
-                              onChange={(e) => setNewPostTitle(e.target.value)}
-                              placeholder="Contoh: Sidak Kebersihan Akhir Pekan"
-                              className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 bg-white"
-                              required
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <label className="block text-[10px] font-bold text-slate-600">Kategori</label>
-                            <select
-                              value={newPostCategory}
-                              onChange={(e) => setNewPostCategory(e.target.value as any)}
-                              className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 bg-white"
-                            >
-                              <option value="Info Penting">Info Penting</option>
-                              <option value="Kegiatan Sosial">Kegiatan Sosial</option>
-                              <option value="Pengumuman">Pengumuman</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label className="block text-[10px] font-bold text-slate-600">Ditujukan Untuk (Angkatan)</label>
-                            <select
-                              value={newPostBatch}
-                              onChange={(e) => setNewPostBatch(e.target.value)}
-                              className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 bg-white"
-                            >
-                              <option value="Angkatan 7">Angkatan 7 (Senior)</option>
-                              <option value="Angkatan 8">Angkatan 8 (Madya)</option>
-                              <option value="Angkatan 9">Angkatan 9 (Baru)</option>
-                            </select>
-                          </div>
-
-                          <div className="space-y-1 flex items-end">
-                            <span className="text-[10px] text-slate-400 italic">
-                              *Dipublikasikan sebagai: &apos;{currentUser?.name || "Pengurus Asrama"}&apos;
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="block text-[10px] font-bold text-slate-600">Detail Isi Berita / Kegiatan Sosial</label>
-                          <textarea
-                             value={newPostContent}
-                             onChange={(e) => setNewPostContent(e.target.value)}
-                             rows={3}
-                             placeholder="Uraikan deskripsi lengkap, tanggal pelaksanaan, tata tertib, dan draf agenda yang mesti dilakukan oleh para awardee di asrama..."
-                             className="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-blue-500 bg-white"
-                             required
-                           />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="block text-[10px] font-bold text-slate-600">Unggah Foto/Gambar Pendukung (Opsional)</label>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => handlePhotoUpload(e, setNewPostImageAttachment)}
-                            className="w-full text-xs text-slate-500 file:mr-3 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-105 cursor-pointer"
-                          />
-                          {newPostImageAttachment && (
-                            <div className="mt-2 relative inline-block">
-                              <img src={newPostImageAttachment} alt="Preview lampiran" className="h-16 w-auto rounded border border-slate-200" />
-                              <button
-                                type="button"
-                                onClick={() => setNewPostImageAttachment(null)}
-                                className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold cursor-pointer hover:bg-rose-600"
-                              >
-                                &times;
-                              </button>
-                            </div>
-                          )}
-                        </div>
-
-                        {postSuccessMsg && (
-                          <div className="p-2 bg-emerald-50 border border-emerald-200 rounded text-[10px] text-emerald-800 font-bold">
-                            ✔ {postSuccessMsg}
-                          </div>
-                        )}
-
-                        <div className="flex justify-end gap-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => setShowAddPostForm(false)}
-                            className="px-2.5 py-1 text-slate-650 hover:bg-slate-200 rounded text-xs select-none cursor-pointer"
-                          >
-                            Batal
-                          </button>
-                          <button
-                            type="submit"
-                            className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold select-none cursor-pointer"
-                          >
-                            Tayangkan Sekarang
-                          </button>
-                        </div>
-                      </form>
-                    )}
-                  </div>
-                )}
-
-                {/* Posts Feed */}
-                <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-                  {/* Highlighted activeBatch indicator */}
-                  <div className="text-[10px] text-slate-400 font-bold mb-1 flex items-center gap-1.5">
-                    <span>Menampilkan Berita Terbaru Khusus:</span>
-                    <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">{selectedBatch}</span>
-                  </div>
-
-                  {activeBatchPosts.length > 0 ? (
-                    activeBatchPosts.map((post) => (
-                      <div key={post.id} className="p-4 bg-slate-50 border border-slate-100 rounded-lg hover:border-slate-300 transition-colors text-left flex gap-3">
-                        <div className="pt-0.5">
-                          {post.category === "Info Penting" ? (
-                            <span className="w-8 h-8 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center font-bold text-xs shrink-0 select-none text-rose-600">!</span>
-                          ) : post.category === "Kegiatan Sosial" ? (
-                            <span className="w-8 h-8 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center font-bold text-xs shrink-0 select-none text-emerald-600">♥</span>
-                          ) : (
-                            <span className="w-8 h-8 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center font-bold text-xs shrink-0 select-none text-blue-600">i</span>
-                          )}
-                        </div>
-
-                        <div className="space-y-1 flex-1">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <h4 className="text-xs font-extrabold text-blue-950 font-sans">{post.title}</h4>
-                            <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                              post.category === "Info Penting" 
-                                ? "bg-rose-50 text-rose-700 border border-rose-200/50" 
-                                : post.category === "Kegiatan Sosial" 
-                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200/50" 
-                                  : "bg-blue-50 text-blue-700 border border-blue-200/50"
-                            }`}>
-                              {post.category}
-                            </span>
-                          </div>
-
-                          <p className="text-[11px] text-slate-650 leading-relaxed font-sans">{post.content}</p>
-
-                          {post.imageUrl && (
-                            <div className="mt-2 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 max-h-[180px] flex items-center justify-start">
-                              <img src={post.imageUrl} alt="Lampiran postingan" className="max-h-[180px] w-auto object-contain rounded-lg" referrerPolicy="no-referrer" />
-                            </div>
-                          )}
-                          
-                          <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold font-mono pt-2">
-                            <span>Oleh: {post.createdBy}</span>
-                            <span>{new Date(post.date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-12 border-2 border-dashed border-slate-200 rounded-lg text-center text-slate-400 space-y-2">
-                      <p className="text-xs font-bold">Tidak ada pengumuman khusus untuk {selectedBatch}.</p>
-                      <p className="text-[10px] text-slate-500">Ubah penyaring angkatan di atas atau hubungi fasilitator asrama untuk memperbarui berkas informasi.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* 2. TIMELINE & KEGIATAN TAB */}
-            {dashboardSubTab === "timeline" && (
-              <div className="space-y-4">
-                
-                {/* Information Callout */}
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-[11px] text-slate-600 leading-normal flex items-start gap-2">
-                  <span className="text-emerald-500 font-bold text-sm leading-none">✔</span>
-                  <div className="text-left">
-                    <span className="font-bold text-slate-800 font-sans">Riwayat Terverifikasi:</span> Berikut adalah galeri linimasa program pembinaan asrama dan pengabdian masyarakat yang telah sukses dituntaskan dan terekam di sistem lengkap dengan tanggal pelaksanaan serta foto dokumentasi riil.
-                  </div>
-                </div>
-
-                <div className="relative border-l-2 border-blue-100 pl-5 ml-2.5 py-1.5 space-y-6">
-                  {timelineHistory.length === 0 ? (
-                    <div className="py-8 text-center text-slate-400 text-xs">
-                      Belum ada kegiatan yang selesai dilaksanakan.
-                    </div>
-                  ) : (
-                    timelineHistory.map((act) => (
-                      <div key={act.id} className="relative group text-left">
-                        {/* Timeline Node Point Dot */}
-                        <div className="absolute -left-[27px] top-1.5 w-3 h-3 rounded-full bg-white border-2 border-blue-500 group-hover:bg-blue-500 transition-colors"></div>
-                        
-                        <div className="space-y-2.5 bg-slate-50/50 hover:bg-slate-50 border border-slate-100 rounded-lg p-4 transition-all">
-                          {/* Date and Category */}
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="text-[10px] text-slate-500 font-mono font-bold">
-                              {new Date(act.date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
-                            </span>
-                            <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                              act.category === "Pengabdian Masyarakat" || act.category === "Lainnya"
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200/50" 
-                                : "bg-blue-50 text-blue-700 border border-blue-200/50"
-                            }`}>
-                              {act.category}
-                            </span>
-                          </div>
-
-                          {/* Title and location */}
-                          <div className="space-y-0.5">
-                            <h4 className="text-xs font-black text-blue-950 font-sans group-hover:text-blue-600 transition-colors">
-                              {act.title}
-                            </h4>
-                            {act.location && (
-                              <p className="text-[9.5px] text-slate-500 font-sans font-semibold">
-                                📍 Lokasi: {act.location}
-                              </p>
-                            )}
-                          </div>
-
-                          <p className="text-[11px] text-slate-650 leading-relaxed font-sans">{act.description}</p>
-
-                          {/* Foto Dokumentasi */}
-                          {act.imageUrl && (
-                            <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-100 max-h-[220px] mt-1.5 shadow-3xs flex items-center justify-start">
-                              <img 
-                                src={act.imageUrl} 
-                                alt={`Dokumentasi ${act.title}`} 
-                                className="max-h-[220px] w-full object-cover rounded-lg group-hover:scale-101 transition-transform duration-300" 
-                                referrerPolicy="no-referrer"
-                              />
-                            </div>
-                          )}
-
-                          <div className="text-[9.5px] text-slate-500 font-bold font-mono border-t border-slate-100 pt-1.5 flex justify-between">
-                            <span>👤 Partisipasi: {act.involvedCount} Awardee Terlibat</span>
-                            <span className="text-emerald-600">Telah Diverifikasi ✓</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

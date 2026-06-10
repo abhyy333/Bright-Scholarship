@@ -15,9 +15,12 @@ import {
   Upload,
   Link as LinkIcon,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Lock,
+  Shield,
+  Key
 } from "lucide-react";
-import { AwardeeProfile, UserRole } from "../types";
+import { AwardeeProfile, UserRole, Activity, User } from "../types";
 
 interface MyProfileProps {
   currentUserProfile: AwardeeProfile | null;
@@ -25,6 +28,13 @@ interface MyProfileProps {
   currentRole: UserRole;
   onNavigateToTab?: (tab: any) => void;
   batches?: string[];
+  activities?: Activity[];
+  currentUser?: User | null;
+  userPasswords?: Record<string, string>;
+  onChangePassword?: (email: string, newPass: string) => boolean;
+  onForgotPassword?: (email: string) => { success: boolean; message: string };
+  onLogout?: () => void;
+  onUpdateUser?: (updated: User) => void;
 }
 
 const PRESET_AVATARS = [
@@ -40,9 +50,355 @@ export default function MyProfile({
   onUpdateAwardee,
   currentRole,
   onNavigateToTab,
-  batches = ["3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]
+  batches = ["3", "4", "5", "6", "7", "8", "9", "10", "11", "12"],
+  activities = [],
+  currentUser,
+  userPasswords,
+  onChangePassword,
+  onForgotPassword,
+  onLogout,
+  onUpdateUser
 }: MyProfileProps) {
+  // Password Change State
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwdError, setPwdError] = useState<string | null>(null);
+  const [pwdSuccess, setPwdSuccess] = useState<string | null>(null);
+  const [showPasswords, setShowPasswords] = useState(false);
+
+  // Staff profile edit states
+  const [graduationYear, setGraduationYear] = useState(currentUser?.graduationYear || "");
+  const [batchYear, setBatchYear] = useState(currentUser?.batchYear || "");
+  const [staffSaveSuccess, setStaffSaveSuccess] = useState(false);
+
+  const handleStaffProfileUpdate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (currentUser && onUpdateUser) {
+      onUpdateUser({
+        ...currentUser,
+        graduationYear: graduationYear.trim(),
+        batchYear: batchYear.trim()
+      });
+      setStaffSaveSuccess(true);
+      setTimeout(() => setStaffSaveSuccess(false), 5000);
+    }
+  };
+
+  const handleForgotPasswordReset = () => {
+    setPwdError(null);
+    setPwdSuccess(null);
+
+    const email = currentUser?.email || (currentUserProfile ? `${currentUserProfile.name.toLowerCase().replace(/\s+/g, "")}@student.ac.id` : null);
+    if (!email) {
+      setPwdError("Email pengguna tidak terdeteksi oleh sistem.");
+      return;
+    }
+
+    if (onForgotPassword) {
+      const result = onForgotPassword(email);
+      if (result.success) {
+        setPwdSuccess(result.message);
+      } else {
+        setPwdError(result.message);
+      }
+    } else {
+      setPwdError("Fitur pemulihan kata sandi tidak terhubung dengan benar.");
+    }
+  };
+
+  const handlePasswordUpdate = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwdError(null);
+    setPwdSuccess(null);
+
+    const email = currentUser?.email || (currentUserProfile ? `${currentUserProfile.name.toLowerCase().replace(/\s+/g, "")}@student.ac.id` : null);
+    if (!email) {
+      setPwdError("Email pengguna tidak terdeteksi oleh sistem.");
+      return;
+    }
+
+    const emailLower = email.toLowerCase();
+    const storedPassword = userPasswords?.[emailLower] || "password123";
+
+    if (currentPassword !== storedPassword) {
+      setPwdError("Kata sandi lama yang Anda masukkan salah.");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPwdError("Kata sandi baru minimal harus terdiri dari 6 karakter.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPwdError("Konfirmasi kata sandi baru tidak sesuai.");
+      return;
+    }
+
+    if (newPassword === currentPassword) {
+      setPwdError("Kata sandi baru tidak boleh sama dengan kata sandi saat ini.");
+      return;
+    }
+
+    if (onChangePassword) {
+      const success = onChangePassword(email, newPassword);
+      if (success) {
+        setPwdSuccess("Kata sandi berhasil diperbarui!");
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        setPwdError("Gagal memperbarui kata sandi. Silakan coba lagi.");
+      }
+    } else {
+      setPwdError("Metode perubahan kata sandi tidak ditemukan.");
+    }
+  };
+
   if (!currentUserProfile) {
+    if (currentUser && (currentUser.role === "admin" || currentUser.role === "fasilitator" || currentUser.role === "kepala_asrama")) {
+      const staffRole = currentUser.role;
+      let roleLabel = "Administrator Utama";
+      let roleBadgeColor = "bg-rose-50 border-rose-200 text-rose-700 font-extrabold shadow-sm";
+      let roleDesc = "Hak akses penuh untuk mengelola pendaftaran, staf kepengurusan, modul NoSQL, serta mempublikasikan jadwal pembinaan asrama.";
+      
+      if (staffRole === "fasilitator") {
+        roleLabel = "Fasilitator Akademik";
+        roleBadgeColor = "bg-indigo-50 border-indigo-200 text-indigo-700 font-extrabold shadow-sm";
+        roleDesc = "Membimbing serta memantau perkembangan nilai akademik (IPK) awardee dan memoderasi log inisiatif kontribusi mahasiswa.";
+      } else if (staffRole === "kepala_asrama") {
+        roleLabel = "Kepala Pengurus Asrama";
+        roleBadgeColor = "bg-amber-50 border-amber-250 text-amber-800 font-extrabold shadow-sm";
+        roleDesc = "Memimpin jalannya asrama, mengawal rsvp jadwal pembinaan, dan mengawasi total jam pengabdian sosial semua awardee aktif.";
+      }
+
+      return (
+        <div className="space-y-6 max-w-4xl mx-auto text-left font-sans">
+          {/* Title Banner */}
+          <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <h2 className="text-base font-black text-blue-955 flex items-center gap-2">
+                <Shield className="w-5 h-5 text-emerald-600" />
+                <span>Manajemen Profil Pengurus</span>
+              </h2>
+              <p className="text-slate-500 text-xs leading-normal">
+                Pusat data kepengurusan dan pengaturan tingkat keamanan kredensial akun pengurus asrama.
+              </p>
+            </div>
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                className="px-4 py-2 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 font-extrabold text-xs rounded-xl shadow-xs cursor-pointer select-none transition-all flex items-center gap-1.5 self-start md:self-auto shrink-0"
+              >
+                <span>Keluar Akun (Logout)</span>
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Box: Admin / Staff Info Card */}
+            <div className="bg-white border border-slate-205 rounded-xl p-6 shadow-xs text-center space-y-6 h-fit">
+              <div className="space-y-4 flex flex-col items-center">
+                <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200 shadow-sm relative">
+                  <Shield className="w-10 h-10 text-slate-500" />
+                  <span className="absolute bottom-0 right-1 w-5 h-5 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center text-[10px] text-white">✓</span>
+                </div>
+                <div className="text-center space-y-1 w-full">
+                  <h3 className="font-black text-sm text-blue-955 truncate leading-tight">{currentUser.name}</h3>
+                  <p className="text-[10px] text-slate-400 truncate">{currentUser.email}</p>
+                  
+                  <div className={`inline-flex items-center gap-1.5 px-3 py-1 ${roleBadgeColor} text-[10px] rounded-full border mt-2.5 uppercase tracking-wide`}>
+                    <span>{roleLabel}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 pt-5 text-left">
+                <h4 className="text-[10px] font-bold text-slate-450 uppercase tracking-widest block font-mono mb-2">Deskripsi Hak Akses</h4>
+                <p className="text-[11px] text-slate-500 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-150">
+                  {roleDesc}
+                </p>
+              </div>
+
+              {(currentUser.role === "fasilitator" || currentUser.role === "kepala_asrama") && (
+                <div className="border-t border-slate-100 pt-5 text-left space-y-3">
+                  <h4 className="text-[10px] font-bold text-slate-450 uppercase tracking-widest block font-mono">Biodata Akademik</h4>
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="bg-slate-55 p-2.5 rounded-lg border border-slate-200">
+                      <span className="block text-[9px] font-bold text-slate-400 uppercase">Angkatan</span>
+                      <strong className="text-slate-800 font-extrabold block mt-0.5">{currentUser.batchYear || "Belum Diatur"}</strong>
+                    </div>
+                    <div className="bg-slate-55 p-2.5 rounded-lg border border-slate-200">
+                      <span className="block text-[9px] font-bold text-slate-400 uppercase">Lulus Tahun</span>
+                      <strong className="text-slate-800 font-extrabold block mt-0.5">{currentUser.graduationYear || "Belum Diatur"}</strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Right Box: Password Change Form */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Profile info form for Fasilitator or Kepala Asrama */}
+              {(currentUser.role === "fasilitator" || currentUser.role === "kepala_asrama") && (
+                <div className="bg-white border border-slate-205 rounded-xl p-6 shadow-xs space-y-4">
+                  <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                    <div className="p-1.5 rounded bg-emerald-50 text-emerald-700">
+                      <GraduationCap className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-slate-900">Histori Akademik &amp; Angkatan (Opsional)</h3>
+                      <p className="text-[10px] text-slate-400 font-normal">Informasi angkatan beasiswa dan tahun lulus pendidikan kepengurusan Anda.</p>
+                    </div>
+                  </div>
+
+                  {staffSaveSuccess && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-emerald-800 text-xs font-bold leading-normal">
+                      <CheckCircle className="w-4 h-4 shrink-0 text-emerald-600" />
+                      <span>Data profil kepengurusan berhasil diperbarui!</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleStaffProfileUpdate} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">Angkatan Ke- (Tulis '-' jika bukan Alumni) *</label>
+                        <input 
+                          type="text" 
+                          value={batchYear}
+                          onChange={(e) => setBatchYear(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-205 p-2 rounded-lg text-xs font-semibold focus:border-blue-500 focus:bg-white outline-none"
+                          placeholder="Misal: Angkatan 7, Angkatan 9, atau -"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">Tahun Kelulusan *</label>
+                        <input 
+                          type="text" 
+                          value={graduationYear}
+                          onChange={(e) => setGraduationYear(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-205 p-2 rounded-lg text-xs font-semibold focus:border-blue-500 focus:bg-white outline-none"
+                          placeholder="Misal: 2024, 2025, atau Belum Lulus"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-emerald-650 hover:bg-emerald-600 bg-emerald-600 text-white text-xs font-extrabold rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        <span>Simpan Profil Akademik</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              <div className="bg-white border border-slate-205 rounded-xl p-6 shadow-xs space-y-4">
+                <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                  <div className="p-1.5 rounded bg-emerald-50 text-emerald-700">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-slate-900">Ganti Kata Sandi (Password)</h3>
+                    <p className="text-[10px] text-slate-400 font-normal">Pastikan password baru Anda kuat dan sulit ditebak orang lain demi keamanan data web.</p>
+                  </div>
+                </div>
+
+                <form onSubmit={handlePasswordUpdate} className="space-y-4">
+                  {pwdError && (
+                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-2.5 text-rose-800 text-xs font-bold leading-normal">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                      <span>{pwdError}</span>
+                    </div>
+                  )}
+
+                  {pwdSuccess && (
+                     <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2.5 text-emerald-800 text-xs font-bold leading-normal">
+                      <CheckCircle className="w-4 h-4 shrink-0 text-emerald-600" />
+                      <span>{pwdSuccess}</span>
+                    </div>
+                  )}
+
+                  <div className="space-y-3.5">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">Kata Sandi Saat Ini *</label>
+                      <input 
+                        type={showPasswords ? "text" : "password"} 
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-205 p-2 rounded-lg text-xs font-semibold focus:border-blue-500 focus:bg-white outline-none"
+                        placeholder="Masukkan kata sandi lama Anda"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">Kata Sandi Baru *</label>
+                      <input 
+                        type={showPasswords ? "text" : "password"} 
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-205 p-2 rounded-lg text-xs font-semibold focus:border-blue-500 focus:bg-white outline-none"
+                        placeholder="Maksimal keamanan (Min. 6 Karakter)"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">Konfirmasi Kata Sandi Baru *</label>
+                      <input 
+                        type={showPasswords ? "text" : "password"} 
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-205 p-2 rounded-lg text-xs font-semibold focus:border-blue-500 focus:bg-white outline-none"
+                        placeholder="Ulangi kata sandi baru Anda"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowPasswords(!showPasswords)}
+                        className="text-[10px] text-blue-600 hover:underline font-bold cursor-pointer"
+                      >
+                        {showPasswords ? "Sembunyikan Sandi" : "Tampilkan Sandi"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleForgotPasswordReset}
+                        className="text-[10px] text-amber-700 hover:underline font-bold cursor-pointer border-l border-slate-205 pl-3"
+                      >
+                        Lupa Password?
+                      </button>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-blue-950 hover:bg-blue-900 text-white text-xs font-black rounded-lg transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>Perbarui Kata Sandi</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="bg-white border border-slate-200 rounded-xl p-8 text-center space-y-4 max-w-xl mx-auto my-8">
         <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
@@ -67,6 +423,24 @@ export default function MyProfile({
       </div>
     );
   }
+
+  // Calculate dynamic hours based on activities where the user actually participated
+  const activeAwardeeId = currentUserProfile.awardeeId;
+  const myActivities = activities.filter(act => act.awardeesInvolved.includes(activeAwardeeId));
+
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  // Waktu pembinaan: Only pembinaan category activities this user participated in AND that have already completed (date <= today)
+  const myPembinaanHours = myActivities
+    .filter(act => act.category === "Pembinaan" && act.date <= todayStr)
+    .reduce((sum, act) => sum + act.hoursEarned, 0);
+
+  // Waktu pengabdian + others
+  const myPengabdianHours = myActivities
+    .filter(act => act.category !== "Pembinaan")
+    .reduce((sum, act) => sum + act.hoursEarned, 0);
+
+  const totalServiceHoursComputed = myPembinaanHours + myPengabdianHours;
 
   // Edit states
   const [isEditing, setIsEditing] = useState(false);
@@ -218,7 +592,7 @@ export default function MyProfile({
       
       {/* Title & Header Banner */}
       <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs text-left flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1">
+        <div className="space-y-1 flex-1">
           <h2 className="text-base font-black text-blue-955 flex items-center gap-2">
             <UserIcon className="w-5 h-5 text-emerald-600" />
             <span>Manajemen Profil Pribadi Anda</span>
@@ -227,26 +601,37 @@ export default function MyProfile({
             Pembaruan profil mandiri demi keakuratan direktori publik asrama & pelacakan jam pembinaan.
           </p>
         </div>
-        {!isEditing && (
-          <button
-            type="button"
-            onClick={() => {
-              setName(currentUserProfile.name);
-              setUniversity(currentUserProfile.university);
-              setMajor(currentUserProfile.major);
-              setBatch(currentUserProfile.batch);
-              setGpa(currentUserProfile.gpa.toString());
-              setBio(currentUserProfile.bio);
-              setLinkedin(currentUserProfile.linkedinUrl || "");
-              setSkills([...(currentUserProfile.skills || [])]);
-              setIsEditing(true);
-            }}
-            className="px-4 py-2 bg-blue-950 text-white font-extrabold hover:bg-blue-900 active:scale-95 text-xs rounded-xl shadow-md cursor-pointer select-none transition-all flex items-center gap-1.5 self-start md:self-auto"
-          >
-            <Camera className="w-3.5 h-3.5" />
-            <span>Edit Data Informasi Profil</span>
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto shrink-0">
+          {!isEditing && (
+            <button
+              type="button"
+              onClick={() => {
+                setName(currentUserProfile.name);
+                setUniversity(currentUserProfile.university);
+                setMajor(currentUserProfile.major);
+                setBatch(currentUserProfile.batch);
+                setGpa(currentUserProfile.gpa.toString());
+                setBio(currentUserProfile.bio);
+                setLinkedin(currentUserProfile.linkedinUrl || "");
+                setSkills([...(currentUserProfile.skills || [])]);
+                setIsEditing(true);
+              }}
+              className="px-4 py-2 bg-blue-950 text-white font-extrabold hover:bg-blue-900 active:scale-95 text-xs rounded-xl shadow-md cursor-pointer select-none transition-all flex items-center gap-1.5"
+            >
+              <Camera className="w-3.5 h-3.5" />
+              <span>Edit Data Informasi Profil</span>
+            </button>
+          )}
+          {onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              className="px-4 py-2 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 font-extrabold text-xs rounded-xl shadow-xs cursor-pointer select-none transition-all flex items-center gap-1.5"
+            >
+              <span>Keluar Akun (Logout)</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {saveSuccess && (
@@ -288,35 +673,61 @@ export default function MyProfile({
             <div className="text-center space-y-1">
               <h3 className="font-black text-sm text-blue-950">{currentUserProfile.name}</h3>
               <p className="text-[11px] text-slate-500 font-mono">{currentUserProfile.batch}</p>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 text-[10px] font-extrabold rounded-full border border-emerald-150 mt-1.5 uppercase tracking-wide">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
-                <span>Awardee Aktif</span>
-              </div>
+              {currentRole === "fasilitator" ? (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-800 text-[10px] font-extrabold rounded-full border border-indigo-200 mt-1.5 uppercase tracking-wide">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-pulse"></span>
+                  <span>Fasilitator Akademik</span>
+                </div>
+              ) : currentRole === "kepala_asrama" ? (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-805 text-[10px] font-extrabold rounded-full border border-amber-250 mt-1.5 uppercase tracking-wide">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse"></span>
+                  <span>Kepala Asrama</span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 text-[10px] font-extrabold rounded-full border border-emerald-150 mt-1.5 uppercase tracking-wide">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                  <span>Awardee Aktif</span>
+                </div>
+              )}
             </div>
           </div>
 
           <div className="border-t border-slate-100 pt-5 space-y-4">
-            <h4 className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest block font-mono">Status Kontribusi Sosial</h4>
+            <h4 className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest block font-mono">Status Waktu Pembinaan</h4>
             
-            <div className="bg-slate-50 border border-slate-150 rounded-xl p-3.5 space-y-3">
-              <div className="flex items-center justify-between text-xs font-semibold">
-                <span className="text-slate-500">Total Jam Pengabdian:</span>
-                <span className="text-emerald-700 font-black text-sm">{currentUserProfile.totalServiceHours} Jam</span>
+            <div className="bg-slate-50 border border-slate-150 rounded-xl p-3.5 space-y-3.5">
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <span className="text-slate-500">Waktu Pembinaan Karakter:</span>
+                  <span className="text-blue-700 font-extrabold text-xs">{myPembinaanHours} Jam</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-1">
+                  <div 
+                    className="bg-blue-600 h-1 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, (myPembinaanHours / 15) * 100)}%` }}
+                  ></div>
+                </div>
+                <div className="flex justify-between items-center text-[9px] text-slate-400 font-mono">
+                  <span>Target: 15 Jam</span>
+                  <span>{Math.round((myPembinaanHours / 15) * 100)}%</span>
+                </div>
               </div>
-              <div className="w-full bg-slate-200 rounded-full h-1.5">
-                <div 
-                  className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(100, (currentUserProfile.totalServiceHours / 60) * 100)}%` }}
-                ></div>
+
+              <div className="border-t border-slate-100 pt-2.5">
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <span className="text-slate-500">Pengabdian & Lainnya:</span>
+                  <span className="text-amber-700 font-extrabold text-xs">{myPengabdianHours} Jam</span>
+                </div>
               </div>
-              <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono">
-                <span>Minimal 60 Jam</span>
-                <span>{Math.round((currentUserProfile.totalServiceHours / 60) * 100)}% Tercapai</span>
+
+              <div className="border-t border-slate-200/60 pt-2.5 flex items-center justify-between text-xs font-bold text-slate-700">
+                <span>Total Jam Kehadiran:</span>
+                <span className="text-emerald-700 font-black text-sm">{totalServiceHoursComputed} Jam</span>
               </div>
             </div>
 
             <p className="text-[10.5px] text-slate-505 leading-relaxed italic">
-              *Detail akumulasi di-update ketika administrasi asrama menyetujui log kegiatan yang Anda daftarkan di menu timeline.
+              *Hanya menghitung kegiatan pembinaan di mana akun Anda terdaftar sebagai peserta yang hadir/terlibat langsung.
             </p>
           </div>
         </div>
@@ -562,6 +973,101 @@ export default function MyProfile({
 
               </div>
 
+            </div>
+          )}
+
+          {!isEditing && (
+            <div className="bg-white border border-slate-205 rounded-xl p-6 shadow-xs space-y-4 text-left">
+              <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                <div className="p-1.5 rounded bg-emerald-50 text-emerald-700">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900">Ganti Kata Sandi Akun</h3>
+                  <p className="text-[10px] text-slate-400 font-normal">Demi menjaga keamanan data kepesertaan beasiswa Anda, ganti password secara berkala.</p>
+                </div>
+              </div>
+
+              <form onSubmit={handlePasswordUpdate} className="space-y-4">
+                {pwdError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-2.5 text-rose-800 text-xs font-bold leading-normal">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                    <span>{pwdError}</span>
+                  </div>
+                )}
+
+                {pwdSuccess && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2.5 text-emerald-800 text-xs font-bold leading-normal">
+                    <CheckCircle className="w-4 h-4 shrink-0 text-emerald-600" />
+                    <span>{pwdSuccess}</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Kata Sandi Saat Ini *</label>
+                    <input 
+                      type={showPasswords ? "text" : "password"} 
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-205 p-2 rounded-lg text-xs font-semibold focus:border-blue-500 focus:bg-white outline-none"
+                      placeholder="Masukkan kata sandi lama"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Kata Sandi Baru *</label>
+                    <input 
+                      type={showPasswords ? "text" : "password"} 
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-205 p-2 rounded-lg text-xs font-semibold focus:border-blue-500 focus:bg-white outline-none"
+                      placeholder="Min. 6 Karakter"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Konfirmasi Kata Sandi Baru *</label>
+                    <input 
+                      type={showPasswords ? "text" : "password"} 
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-205 p-2 rounded-lg text-xs font-semibold focus:border-blue-500 focus:bg-white outline-none"
+                      placeholder="Ulangi kata sandi baru"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswords(!showPasswords)}
+                      className="text-[10px] text-blue-600 hover:underline font-bold cursor-pointer"
+                    >
+                      {showPasswords ? "Sembunyikan Kata Sandi" : "Tampilkan Kata Sandi"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleForgotPasswordReset}
+                      className="text-[10px] text-amber-700 hover:underline font-bold cursor-pointer border-l border-slate-205 pl-3"
+                    >
+                      Lupa Password?
+                    </button>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 hover:scale-[1.02] text-white text-xs font-extrabold rounded-lg shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Simpan Kata Sandi Baru</span>
+                  </button>
+                </div>
+              </form>
             </div>
           )}
 

@@ -134,7 +134,25 @@ app.use(express.json());
       <!-- Accounts Choices -->
       <div class="w-full text-left" id="account-chooser">
         
-        <!-- Account Item 1: abdul habir -->
+        <!-- Account Item 1: abhyy333 -->
+        <button 
+          type="button" 
+          onclick="selectAccount('abhyy333@gmail.com', 'Abhyy (Pengurus Pusat)')"
+          class="w-full py-3.5 px-2.5 hover:bg-[#202124] rounded-lg text-left transition-colors flex items-center gap-4 cursor-pointer focus:outline-none focus:bg-[#202124]"
+        >
+          <div class="w-8 h-8 rounded-full bg-[#0f9d58] text-white flex items-center justify-center font-bold text-[14px] shadow-sm uppercase shrink-0">
+            A
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-[13.5px] font-medium text-[#e3e2e6] tracking-wide">Abhyy (Pengurus Pusat)</div>
+            <div class="text-[11.5px] text-[#9aa0a6] truncate font-sans">abhyy333@gmail.com</div>
+          </div>
+        </button>
+
+        <!-- Divider -->
+        <div class="h-[1px] bg-[#303134] my-1"></div>
+
+        <!-- Account Item 2: abdul habir -->
         <button 
           type="button" 
           onclick="selectAccount('abdulhabir66@gmail.com', 'Abdul Habir')"

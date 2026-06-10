@@ -15,7 +15,8 @@ import {
   ShieldAlert,
   Sliders,
   Check,
-  Layers
+  Layers,
+  Users
 } from "lucide-react";
 import { AwardeeProfile, User, EmailNotification, UserRole } from "../types";
 
@@ -80,6 +81,7 @@ export default function AdminPanel({
   const [editingAwardeeId, setEditingAwardeeId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmDeleteStaffId, setConfirmDeleteStaffId] = useState<string | null>(null);
+  const [promoteSearchTerm, setPromoteSearchTerm] = useState("");
 
   // Edit Form States
   const [editName, setEditName] = useState("");
@@ -444,6 +446,26 @@ export default function AdminPanel({
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <h5 className="font-extrabold text-[12.5px] text-slate-900 leading-snug">{aw.name}</h5>
                                   
+                                  {/* Staff / Promoted Badges */}
+                                  {(() => {
+                                    const matchUser = users?.find(u => u.uid === aw.awardeeId || u.name.toLowerCase() === aw.name.toLowerCase());
+                                    if (matchUser?.role === "fasilitator") {
+                                      return (
+                                        <span className="text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded">
+                                          Fasilitator
+                                        </span>
+                                      );
+                                    }
+                                    if (matchUser?.role === "kepala_asrama") {
+                                      return (
+                                        <span className="text-[9px] font-black uppercase tracking-wider bg-amber-50 text-amber-705 border border-amber-250 px-1.5 py-0.5 rounded">
+                                          Kepala Asrama
+                                        </span>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+
                                   {/* Status Badges */}
                                   {aw.status === "active" && (
                                     <span className="text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded">
@@ -474,6 +496,16 @@ export default function AdminPanel({
                                 <p className="text-[10px] text-slate-500 font-medium mt-0.5">
                                   {aw.university} &bull; {aw.major}
                                 </p>
+                                {(() => {
+                                  const matchUser = users?.find(u => u.uid === aw.awardeeId || u.name.toLowerCase() === aw.name.toLowerCase());
+                                  const emailDisplay = matchUser?.email || `${aw.name.toLowerCase().replace(/\s+/g, "")}@brightscholarship.org`;
+                                  return (
+                                    <p className="text-[9.5px] text-blue-600 font-black font-mono flex items-center gap-1 mt-0.5">
+                                      <Mail className="w-2.5 h-2.5 shrink-0 text-blue-500" />
+                                      <span>{emailDisplay}</span>
+                                    </p>
+                                  );
+                                })()}
                                 <div className="flex gap-2 items-center flex-wrap pt-1 text-[9.5px] text-slate-600 font-mono font-bold uppercase">
                                   <span>📚 IPK {aw.gpa.toFixed(2)}</span>
                                   <span>&bull;</span>
@@ -735,6 +767,139 @@ export default function AdminPanel({
               <p className="text-[11px] text-slate-500 font-sans">
                 Tambahkan dan kelola kredensial email Fasilitator Akademik serta Kepala Asrama untuk memiliki otorisasi penuh, kecuali menu NoSQL dan Kelola Database.
               </p>
+            </div>
+
+            {/* Promosikan Awardee Seksi */}
+            <div className="bg-emerald-50/45 border border-emerald-250 border-emerald-200 rounded-xl p-4.5 space-y-3 text-left">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-emerald-650 text-emerald-600" />
+                <h5 className="text-[11.5px] font-black uppercase tracking-wider text-emerald-950">Promosi Cepat Awardee Aktif</h5>
+              </div>
+              <p className="text-[11px] text-emerald-900 leading-normal">
+                Ketik nama atau universitas awardee aktif untuk melengkapi formulir pendaftaran staf di bawah secara otomatis.
+              </p>
+              
+              {/* Search input field */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Ketik nama atau kampus asrama awardee..."
+                  value={promoteSearchTerm}
+                  onChange={(e) => setPromoteSearchTerm(e.target.value)}
+                  className="w-full pl-8.5 pl-8 pr-3 py-1.5 bg-white border border-slate-205 rounded-lg text-xs font-semibold focus:border-emerald-555 focus:border-emerald-500 outline-none placeholder-slate-405 text-slate-800"
+                />
+                {promoteSearchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setPromoteSearchTerm("")}
+                    className="absolute right-2.5 top-2 text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded cursor-pointer font-bold"
+                  >
+                    Batal
+                  </button>
+                )}
+              </div>
+
+              {/* Suggestions dropdown logic (Only shows if search term has input) */}
+              {promoteSearchTerm ? (
+                <div className="bg-white border border-slate-200/80 rounded-lg divide-y divide-slate-100 overflow-hidden shadow-xs animate-fadeIn max-h-40 overflow-y-auto">
+                  {(() => {
+                    const filtered = awardees
+                      ? awardees.filter(
+                          (a) =>
+                            a.status === "active" &&
+                            (a.name.toLowerCase().includes(promoteSearchTerm.toLowerCase()) ||
+                              a.university.toLowerCase().includes(promoteSearchTerm.toLowerCase()))
+                        )
+                      : [];
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="p-3 text-center text-[10.5px] text-slate-400 font-medium">
+                          Tidak ditemukan awardee aktif dengan nama/kampus tersebut.
+                        </div>
+                      );
+                    }
+
+                    return filtered.map((a) => {
+                      const awardeeUser = users?.find((u) => u.uid === a.awardeeId || u.name === a.name);
+                      const awardeeEmail =
+                        awardeeUser?.email || `${a.name.toLowerCase().replace(/\s+/g, "")}@brightscholarship.org`;
+                      const isSelected = newStaffEmail.toLowerCase() === awardeeEmail.toLowerCase();
+
+                      return (
+                        <div
+                          key={a.awardeeId}
+                          className={`flex items-center justify-between p-2 hover:bg-slate-50 transition-colors text-xs ${
+                            isSelected ? "bg-emerald-50/50" : ""
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 truncate">
+                            {a.avatarUrl ? (
+                              <img
+                                src={a.avatarUrl}
+                                alt={a.name}
+                                className="w-5 h-5 rounded-full object-cover shrink-0 border border-slate-200"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[8px] shrink-0 uppercase">
+                                {a.name.slice(0, 2)}
+                              </div>
+                            )}
+                            <div className="truncate">
+                              <span className="font-extrabold text-[11px] block text-slate-800 leading-tight">
+                                {a.name}
+                              </span>
+                              <span className="text-[9px] block text-slate-400 font-mono leading-none">
+                                {a.university} &bull; {a.batch}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewStaffName(a.name);
+                              setNewStaffEmail(awardeeEmail);
+                              setNewStaffSuccess(null);
+                              setNewStaffError(null);
+                              setPromoteSearchTerm(""); // Reset on select
+                            }}
+                            className={`px-2 py-1 rounded text-[10px] font-black transition-all cursor-pointer ${
+                              isSelected
+                                ? "bg-emerald-600 text-white"
+                                : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700"
+                            }`}
+                          >
+                            {isSelected ? "Terpilih" : "Pilih"}
+                          </button>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              ) : null}
+
+              {/* Selected awardee badge */}
+              {newStaffEmail && (
+                <div className="flex items-center justify-between bg-white px-3 py-1.5 rounded-md border border-slate-200 text-[10px] animate-fadeIn pr-2 shadow-3xs">
+                  <span className="font-semibold text-slate-700">
+                    Siswa Terpilih: <span className="text-emerald-700 font-extrabold">{newStaffName}</span>{" "}
+                    <span className="text-slate-400 font-mono">({newStaffEmail})</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewStaffName("");
+                      setNewStaffEmail("");
+                    }}
+                    className="text-rose-600 font-extrabold hover:underline text-[9.5px] cursor-pointer"
+                  >
+                    Batal Pilih
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Form Tambah Staf Baru */}

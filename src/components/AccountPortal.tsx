@@ -539,7 +539,17 @@ export default function AccountPortal({
             </div>
           ) : (
             /* Login Register Screen */
-            <div className="max-w-xl mx-auto w-full bg-white border border-slate-205 rounded-xl shadow-md overflow-hidden">
+            <div className="max-w-xl mx-auto w-full space-y-6">
+              <div className="flex flex-col items-center justify-center p-4 text-center bg-white/50 backdrop-blur-xs border border-slate-200/60 rounded-xl">
+                <img 
+                  src="https://biologi.fkip.uns.ac.id/wp-content/uploads/2023/03/Logo-Bright-Scholarship.png" 
+                  alt="Bright Scholarship Logo" 
+                  referrerPolicy="no-referrer"
+                  className="h-14 w-auto object-contain max-w-[280px]"
+                />
+              </div>
+
+              <div className="bg-white border border-slate-205 rounded-xl shadow-md overflow-hidden">
               
               {/* Tabs selector */}
               <div className="flex border-b border-slate-200">
@@ -591,8 +601,19 @@ export default function AccountPortal({
                       </div>
 
                       {forgotSuccess && (
-                        <div className="p-3 bg-emerald-50 border border-emerald-250 text-emerald-805 text-xs font-semibold rounded-lg leading-relaxed">
-                          {forgotSuccess}
+                        <div className="space-y-3 animate-fadeIn">
+                          <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold rounded-lg leading-relaxed">
+                            ✔ {forgotSuccess}
+                          </div>
+                          
+                          {/* Spam folder notification check */}
+                          <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-lg flex items-start gap-2.5 leading-relaxed">
+                            <span className="text-base select-none leading-none pt-0.5">📧</span>
+                            <div>
+                              <strong className="block font-black text-amber-950 mb-0.5">PENTING: Periksa Folder Utama & SPAM!</strong>
+                              Silakan periksa folder <span className="underline font-bold">Spam atau Junk / Sampah</span> pada email Anda jika dalam waktu 1-2 menit ke depan surel tidak kunjung berlabuh di Kotak Masuk utama.
+                            </div>
+                          </div>
                         </div>
                       )}
 
@@ -1048,7 +1069,8 @@ export default function AccountPortal({
                 )}
               </div>
             </div>
-          )}
+          </div>
+        )}
       </div>
     </div>
   );
