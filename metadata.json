@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Bright Scholarship",
+  "description": "Sistem Informasi Akademik dan Analytics Nilai, Peringkat, dan Early Warning System SMAN 1 Sumbawa Besar untuk Guru, Wali Kelas, dan Kepala Sekolah.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

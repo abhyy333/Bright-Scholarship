@@ -1,0 +1,214 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ==========================================
+    // 1. GLOBAL SAFETY NET & CATCH-ALL
+    // ==========================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ==========================================
+    // 2. HARDENED REUSABLE HELPER FUNCTIONS
+    // ==========================================
+    
+    // Checks if the user is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Validates that string ID is non-empty, limited in sizing, and alphanumeric
+    function isValidId(id) {
+      return id is string 
+        && id.size() > 0 
+        && id.size() <= 128 
+        && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Fetches the authenticated user's profile document from Firestore
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Checks if the authenticated user has a specific role
+    function hasRole(role) {
+      return isSignedIn() 
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && getUserData().role == role;
+    }
+
+    // Returns the draft resource state being proposed for a write
+    function incoming() {
+      return request.resource.data;
+    }
+
+    // Returns the current resource state existing in the database
+    function existing() {
+      return resource.data;
+    }
+
+    // ==========================================
+    // 3. ENTITY-SPECIFIC SCHEMAS (VALIDATION BLUEPRINTS)
+    // ==========================================
+    
+    // Validate User document shape
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'name', 'email', 'role'])
+        && data.uid is string
+        && data.uid.size() > 0
+        && data.uid.size() <= 128
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 200
+        && data.email is string
+        && data.email.size() > 0
+        && data.email.size() <= 200
+        && data.role in ['admin', 'awardee', 'public'];
+    }
+
+    // Validate Awardee Profile document shape
+    function isValidAwardeeProfile(data) {
+      return data.keys().hasAll(['awardeeId', 'name', 'university', 'major', 'batch', 'status'])
+        && data.awardeeId is string
+        && data.awardeeId.size() > 0
+        && data.awardeeId.size() <= 128
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 200
+        && data.university is string
+        && data.university.size() > 0
+        && data.university.size() <= 200
+        && data.major is string
+        && data.major.size() > 0
+        && data.major.size() <= 200
+        && data.batch is string
+        && data.batch.size() > 0
+        && data.batch.size() <= 50
+        && data.status in ['active', 'alumni']
+        && (!('bio' in data) || (data.bio is string && data.bio.size() <= 1000))
+        && (!('linkedinUrl' in data) || (data.linkedinUrl is string && data.linkedinUrl.size() <= 500))
+        && (!('skills' in data) || data.skills is list)
+        && (!('totalServiceHours' in data) || data.totalServiceHours is number);
+    }
+
+    // Validate Activity document shape
+    function isValidActivity(data) {
+      return data.keys().hasAll(['activityId', 'title', 'description', 'date', 'category', 'awardeesInvolved', 'hoursEarned'])
+        && data.activityId is string
+        && data.activityId.size() > 0
+        && data.activityId.size() <= 128
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 200
+        && data.description is string
+        && data.description.size() > 0
+        && data.description.size() <= 2000
+        && data.date is string
+        && data.date.size() == 10
+        && data.category in ['Pembinaan', 'Pengabdian Masyarakat', 'Capacity Building', 'Lainnya']
+        && data.awardeesInvolved is list
+        && data.hoursEarned is number
+        && data.hoursEarned >= 0
+        && (!('mediaUrl' in data) || (data.mediaUrl is string && data.mediaUrl.size() <= 500))
+        && (!('location' in data) || (data.location is string && data.location.size() <= 200))
+        && (!('createdBy' in data) || (data.createdBy is string && data.createdBy.size() <= 128));
+    }
+
+    // Validate ImpactStat document shape
+    function isValidImpactStat(data) {
+      return data.keys().hasAll(['statId', 'totalAwardeesCount', 'totalActivitiesCount', 'totalServiceHours'])
+        && data.statId is string
+        && data.statId.size() > 0
+        && data.statId.size() <= 128
+        && data.totalAwardeesCount is number
+        && data.totalAwardeesCount >= 0
+        && data.totalActivitiesCount is number
+        && data.totalActivitiesCount >= 0
+        && data.totalServiceHours is number
+        && data.totalServiceHours >= 0
+        && (!('pembinaanHours' in data) || data.pembinaanHours is number)
+        && (!('pengabdianHours' in data) || data.pengabdianHours is number);
+    }
+
+    // ==========================================
+    // 4. RESOURCE SPECIFIC MATCH BLOCKS (RBAC)
+    // ==========================================
+
+    // MATCH: `/users` Collection
+    match /users/{userId} {
+      allow get: if isSignedIn()
+        && (request.auth.uid == userId || hasRole('admin'));
+            
+      allow list: if isSignedIn() && hasRole('admin');
+
+      // Users can register their account after first Google Auth sign in
+      allow create: if isSignedIn() 
+        && request.auth.uid == userId 
+        && isValidUser(incoming())
+        && incoming().role in ['awardee', 'public']; // Admins must be set via console/existing admin
+
+      // Prevent users from escalating/updating their own roles; only admin can edit roles
+      allow update: if isSignedIn() 
+        && isValidUser(incoming()) 
+        && (hasRole('admin') 
+            || (request.auth.uid == userId 
+                && incoming().role == existing().role 
+                && incoming().uid == existing().uid));
+
+      allow delete: if isSignedIn() && hasRole('admin');
+    }
+
+    // MATCH: `/awardees` Collection
+    match /awardees/{awardeeId} {
+      // Awardee profiles are public so companies/stakeholders can browse awardees and their skills!
+      allow get, list: if true;
+
+      allow create: if (isSignedIn() && hasRole('admin') && isValidAwardeeProfile(incoming()) && isValidId(awardeeId))
+        || (isSignedIn() && request.auth.uid == awardeeId && hasRole('awardee') && isValidAwardeeProfile(incoming()) && incoming().totalServiceHours == 0);
+
+      allow update: if isSignedIn() 
+        && isValidAwardeeProfile(incoming()) 
+        && (hasRole('admin') 
+            || (request.auth.uid == awardeeId 
+                && incoming().awardeeId == existing().awardeeId
+                && incoming().university == existing().university
+                && incoming().major == existing().major
+                && incoming().batch == existing().batch
+                && incoming().status == existing().status
+                && incoming().totalServiceHours == existing().totalServiceHours
+                && incoming().diff(existing()).affectedKeys().hasOnly(['bio', 'linkedinUrl', 'skills', 'name', 'updatedAt'])));
+
+      allow delete: if isSignedIn() && hasRole('admin');
+    }
+
+    // MATCH: `/activities` Collection
+    match /activities/{activityId} {
+      allow get, list: if true; // Public can search/view documented achievements and kegiatan
+
+      allow create: if isSignedIn() && hasRole('admin') && isValidActivity(incoming()) && isValidId(activityId);
+      allow update: if isSignedIn() 
+        && (hasRole('admin') 
+            || (hasRole('awardee') 
+                && isValidActivity(incoming())
+                && incoming().activityId == existing().activityId
+                && incoming().title == existing().title
+                && incoming().description == existing().description
+                && incoming().date == existing().date
+                && incoming().category == existing().category
+                && incoming().hoursEarned == existing().hoursEarned
+                && incoming().diff(existing()).affectedKeys().hasOnly(['awardeesInvolved']))); // Awardees can RSVP/join activities
+
+      allow delete: if isSignedIn() && hasRole('admin');
+    }
+
+    // MATCH: `/impact_stats` Collection
+    match /impact_stats/{statId} {
+      allow get: if true; // Public can see high-level statistics of total service hours
+      allow list: if isSignedIn();
+
+      allow create, update: if isSignedIn() && hasRole('admin') && isValidImpactStat(incoming()) && isValidId(statId);
+      allow delete: if isSignedIn() && hasRole('admin');
+    }
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Account",
+      "description": "System-level user account defining credentials and authorization roles.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique identifier matching Firebase Auth UID." },
+        "name": { "type": "string", "description": "Full name of the user." },
+        "email": { "type": "string", "description": "Verified email address." },
+        "role": { "type": "string", "enum": ["admin", "awardee", "public"], "description": "System access role." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "email", "role"]
+    },
+    "AwardeeProfile": {
+      "title": "Awardee Profile",
+      "description": "Comprehensive academic and professional registry for Bright Scholarship recipients.",
+      "type": "object",
+      "properties": {
+        "awardeeId": { "type": "string", "description": "Foreign key pointing to the awardee's User uid." },
+        "name": { "type": "string", "description": "Full name of the awardee." },
+        "university": { "type": "string", "description": "E.g., Universitas Indonesia, Universitas Mataram, etc." },
+        "major": { "type": "string", "description": "Field of study/department." },
+        "batch": { "type": "string", "description": "Scholarship angkatan / cohort year (e.g., 'Angkatan 7', 'Angkatan 8')." },
+        "gpa": { "type": "number", "description": "Current Grade Point Average (IPK)." },
+        "bio": { "type": "string", "description": "A short self-introductory summary or professional headline." },
+        "linkedinUrl": { "type": "string", "description": "Link to LinkedIn profile." },
+        "skills": { "type": "array", "description": "Array of technology, leadership, or technical skills." },
+        "totalServiceHours": { "type": "number", "description": "Aggregated cache of social work and community development hours." },
+        "status": { "type": "string", "enum": ["active", "alumni"], "description": "Current status of the scholarship recipient." },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["awardeeId", "name", "university", "major", "batch", "status"]
+    },
+    "Activity": {
+      "title": "Scholarship Activity",
+      "description": "Event and program logs for leadership pembinaan and community engagement pengabdian.",
+      "type": "object",
+      "properties": {
+        "activityId": { "type": "string", "description": "Unique identifier for the activity log." },
+        "title": { "type": "string", "description": "Title of the activity." },
+        "description": { "type": "string", "description": "Detailed description of activities and impact." },
+        "date": { "type": "string", "format": "date", "description": "Calendar date of the activity (YYYY-MM-DD)." },
+        "category": { "type": "string", "enum": ["Pembinaan", "Pengabdian Masyarakat", "Capacity Building", "Lainnya"], "description": "Activity classification." },
+        "mediaUrl": { "type": "string", "description": "Photo documentation or reference folder link." },
+        "awardeesInvolved": { "type": "array", "description": "List of awardee UIDs active or participating in this event." },
+        "hoursEarned": { "type": "number", "description": "Number of social/service hours earned per awardee for participating." },
+        "location": { "type": "string", "description": "Venue, village, or link if online." },
+        "createdBy": { "type": "string", "description": "UID of the Admin who logged the activity." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["activityId", "title", "description", "date", "category", "awardeesInvolved", "hoursEarned"]
+    },
+    "ImpactStat": {
+      "title": "Impact Statistics",
+      "description": "Global cache for real-time dashboard data aggregations.",
+      "type": "object",
+      "properties": {
+        "statId": { "type": "string", "description": "Key identifier (typically 'global_analytics')." },
+        "totalAwardeesCount": { "type": "number", "description": "Total registered awardees." },
+        "totalActivitiesCount": { "type": "number", "description": "Total organized activities." },
+        "totalServiceHours": { "type": "number", "description": "Total service and pengabdian hours logged across the scholarship." },
+        "pembinaanHours": { "type": "number", "description": "Aggr. duration of leadership and capacity building seminars." },
+        "pengabdianHours": { "type": "number", "description": "Aggr. duration of community outreach." },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["statId", "totalAwardeesCount", "totalActivitiesCount", "totalServiceHours"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Registered system user account information mapping roles (Admin, Awardee, Public)."
+    },
+    "/awardees/{awardeeId}": {
+      "schema": "AwardeeProfile",
+      "description": "Detailed biographical, academic, and professional profile of Bright Scholarship awardees."
+    },
+    "/activities/{activityId}": {
+      "schema": "Activity",
+      "description": "Logbook database of events, pembinaan, and pengabdian masyarakat."
+    },
+    "/impact_stats/{statId}": {
+      "schema": "ImpactStat",
+      "description": "Aggregated cache for ultra-fast, cost-effective dashboard analytics rendering."
+    }
+  }
+}
