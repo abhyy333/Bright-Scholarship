@@ -1,11 +1,7 @@
 {
   "name": "Remix: Bright Scholarship",
   "description": "Sistem Portal Asrama Digital Terpadu Bright Scholarship untuk manajemen pembinaan, pelaporan kontribusi, integrasi keaktifan belajar, dan konsultasi karir AI.",
-  "requestFramePermissions": [
-    "camera",
-    "microphone",
-    "geolocation"
-  ],
+  "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]
