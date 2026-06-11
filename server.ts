@@ -667,4 +667,20 @@ app.use(express.json());
     }
   });
 
+  // Serve static files in production (Vercel Node runtime)
+  const distPath = path.join(process.cwd(), "dist");
+  app.use(express.static(distPath));
+
+  // Serve index.html as fallback for SPA routing (only if it's not an API route)
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api/")) {
+      return next();
+    }
+    res.sendFile(path.join(distPath, "index.html"), (err) => {
+      if (err) {
+        res.status(404).send("Front-end build files not found. Please ensure 'npm run build' competed successfully.");
+      }
+    });
+  });
+
 export default app;
