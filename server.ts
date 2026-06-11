@@ -667,20 +667,35 @@ app.use(express.json());
     }
   });
 
-  // Serve static files in production (Vercel Node runtime)
-  const distPath = path.join(process.cwd(), "dist");
-  app.use(express.static(distPath));
-
-  // Serve index.html as fallback for SPA routing (only if it's not an API route)
-  app.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api/")) {
-      return next();
-    }
-    res.sendFile(path.join(distPath, "index.html"), (err) => {
-      if (err) {
-        res.status(404).send("Front-end build files not found. Please ensure 'npm run build' competed successfully.");
+  // ==========================================
+  // INTEGRATE VITE FOR MIDDLEWARE (DEV VS PROD)
+  // ==========================================
+  async function runDevOrProdServer() {
+    const PORT = 3000;
+    if (!process.env.VERCEL) {
+      if (process.env.NODE_ENV !== "production") {
+        const { createServer: createViteServer } = await import("vite");
+        const vite = await createViteServer({
+          server: { middlewareMode: true },
+          appType: "spa",
+        });
+        // This connects Vite asset serving and route handling to Express
+        app.use(vite.middlewares);
+      } else {
+        const distPath = path.join(process.cwd(), "dist");
+        app.use(express.static(distPath));
+        // Serve client SPA fallback
+        app.get("*", (req, res) => {
+          res.sendFile(path.join(distPath, "index.html"));
+        });
       }
-    });
-  });
+
+      app.listen(PORT, "0.0.0.0", () => {
+        console.log(`[FULL-STACK ENGINE] Bright Scholarship Server listening on port ${PORT}`);
+      });
+    }
+  }
+
+  runDevOrProdServer();
 
 export default app;

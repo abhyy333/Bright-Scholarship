@@ -268,16 +268,21 @@ export default function AwardeeAchievements({
               {/* Left Side */}
               <div className="space-y-3.5">
                 <div className="space-y-1">
-                  <label className="text-xs text-slate-600 font-bold block">Nama Awardee</label>
-                  <div className="w-full bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-slate-800 text-xs font-bold flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black flex items-center justify-center uppercase">
-                      {(currentUserProfile?.name || "AW").slice(0, 2)}
-                    </div>
-                    <span>{currentUserProfile?.name || "Nama Tidak Ditemukan"}</span>
-                    {currentUserProfile?.university && (
-                      <span className="text-[10px] text-slate-500 font-normal">({currentUserProfile.university})</span>
-                    )}
-                  </div>
+                  <label className="text-xs text-slate-600 font-bold block">Pilih Awardee Juara *</label>
+                  <select
+                    value={selectedAwardeeId}
+                    onChange={(e) => setSelectedAwardeeId(e.target.value)}
+                    className="w-full bg-slate-100/80 border border-slate-200 p-2.5 rounded-lg text-slate-500 text-xs font-semibold outline-none cursor-not-allowed"
+                    disabled={!isStaff}
+                    required
+                  >
+                    <option value="">-- Pilih Mahasiswa Penerima Beasiswa --</option>
+                    {awardees.map(a => (
+                      <option key={a.awardeeId} value={a.awardeeId}>
+                        {a.name} ({a.university})
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="space-y-1">
